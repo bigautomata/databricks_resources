@@ -1,0 +1,737 @@
+--------------------Core Findings for Lakeflow Declarative Pipeline -------------------
+
+The `system.lakeflow.pipeline` table in Databricks provides essential metadata about Lakeflow Spark Declarative Pipelines. 
+Here’s a breakdown of what it is, why it matters, when to use it, and how to leverage its metrics—fully aligned 
+with Databricks best practices:
+
+---
+
+**What is the `system.lakeflow.pipeline` table?**
+
+- It is a system table that stores metadata about each Lakeflow pipeline in Databricks workspace.
+- Key columns include pipeline identifiers, configuration, settings, type, creator, and execution context.
+- This table does not store operational metrics (like throughput or latency), but rather the descriptive and 
+configuration metadata for each pipeline.
+- Tracks all pipelines created in the account.
+
+---
+
+**Why use metadata metrics from this table?**
+
+- **Governance & Auditing:** Track who created pipelines, their configuration, and execution context for compliance 
+and operational transparency.
+- **Pipeline Management:** Quickly list, filter, and review pipeline configurations to ensure they meet organizational standards.
+- **Change Tracking:** Monitor changes in pipeline settings, types, and ownership to support versioning and change management.
+- **Resource Optimization:** Understand pipeline configurations to optimize cluster usage and resource allocation in line 
+with best practices[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/").
+
+---
+
+**When should use these metrics?**
+- **During pipeline creation and onboarding:** Validate that new pipelines are configured correctly and follow best practices.
+- **For regular audits:** Periodically review pipeline metadata to ensure compliance, security, and optimal resource usage.
+- **When troubleshooting:** Use metadata to correlate pipeline configuration with operational issues or performance bottlenecks.
+- **For reporting and inventory:** Generate lists of all pipelines, their owners, and configurations for management and governance.
+
+---
+
+**How to use the metadata metrics from `system.lakeflow.pipeline`?**
+
+1. **Query the Table:** Use Databricks SQL to extract pipeline metadata for analysis or reporting.
+   ```sql
+   SELECT workspace_id, pipeline_id, name, pipeline_type, created_by, run_as, settings, configuration
+   FROM system.lakeflow.pipeline
+   ```
+2. **Audit Ownership and Permissions:** Review `created_by` and `run_as` to ensure pipelines are managed by authorized users or service principals.
+3. **Validate Configuration:** Check the `settings` and `configuration` columns to confirm pipelines are using recommended cluster sizes, libraries, and Spark configurations.
+4. **Inventory Pipelines:** List all pipelines by `pipeline_type` and `name` to understand the landscape of data processing in your workspace.
+5. **Monitor for Compliance:** Use metadata to ensure pipelines adhere to data governance, security, and operational standards[[2]](https://docs.databricks.com/aws/en/lakehouse-architecture/data-governance/best-practices/ "/docs.databricks.com/aws/en/lakehouse-architecture/data-governance/best-practices/").
+
+---
+
+**Best Practices:**
+
+- Regularly review pipeline metadata to ensure alignment with organizational policies and resource optimization strategies.
+- Use the metadata in conjunction with operational metrics (from other system tables) for holistic observability and troubleshooting[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/").
+- Automate reporting and alerts for unauthorized changes or non-compliant configurations.
+
+---
+
+By leveraging the `system.lakeflow.pipeline` table, gain visibility and control over Lakeflow pipelines, supporting governance, 
+optimization, and reliable data engineering operations in Databricks.
+
+
+Here’s a detailed breakdown of the key column values in the `system.lakeflow.pipelines` table, fully aligned 
+with Databricks documentation:
+
+
+**1. workspace_id**  
+- **Description:** The unique identifier for the Databricks workspace where the pipeline resides.  
+- **Value:** A string, such as `"1234567890123456"`. This helps to distinguish pipelines across different workspaces in Databricks account[[1]]
+
+**2. pipeline_id**  
+- **Description:** The unique identifier for the pipeline within a workspace.  
+- **Value:** A string, such as `"abcdef1234567890"`. Note that this is only unique within a single workspace, so should always 
+use it together with `workspace_id` for global uniqueness[[1]]
+**3. settings**  
+- **Description:** A struct containing the settings of the pipeline.  
+- **Value:** This includes configuration options such as cluster settings, libraries, storage locations, and other pipeline-specific parameters.  
+- **Reference:** For a full list and explanation of possible settings, see the [Pipeline settings reference](https://docs.databricks.com/aws/en/admin/system-tables/jobs#pipeline-settings-reference)
+**4. pipeline_type**  
+- **Description:** The type of the pipeline.  
+- **Value:** A string indicating the pipeline’s type. 
+- **Reference:** For all possible values and their meanings, see https://docs.databricks.com/aws/en/admin/system-tables/jobs#pipeline-type-values
+
+**5. name**  
+- **Description:** The user-supplied name of the pipeline.  
+- **Value:** A string, such as `"Customer Data ETL"`. This is set by the user when creating the pipeline and is used for display and identification purposes[[1]].
+
+**6. created_by**  
+- **Description:** The service principal ID of the user who created the pipeline.  
+- **Value:** A string, such as service principal ID. This is useful for auditing and tracking ownership[[1]]
+
+**7. run_as**  
+- **Description:** The service principal ID whose permissions are used for the pipeline run.  
+- **Value:** A string determines the security context under which the pipeline executes[[1]]
+**8. configuration**  
+- **Description:** A map containing user-supplied configuration for the pipeline.  
+- **Value:** Key-value pairs, such as `{"spark.sql.shuffle.partitions": "200", "custom_param": "value"}`. This allows users to pass custom Spark or pipeline parameters at runtime[[1]]
+**Summary Table Example:**
+
+| Column         | Example Value                | Description/Notes                                                                 |
+|----------------|-----------------------------|-----------------------------------------------------------------------------------|
+| workspace_id   | "1234567890123456"          | Unique workspace identifier                                                       |
+| pipeline_id    | "abcdef1234567890"          | Unique pipeline identifier (within workspace)                                     |
+| settings       | {cluster, storage, ...}     | Struct with pipeline settings (see reference for details)                         |
+| pipeline_type  | "DELTA_LIVE_TABLES"         | Type of pipeline (see reference for all possible values)                          |
+| name           | "Customer Data ETL"         | User-supplied pipeline name                                                       |
+| created_by     | "user@example.com"          | Creator’s email or service principal ID                                           |
+| run_as         | "service-principal@example.com" | Permissions context for pipeline execution                                    |
+| configuration  | {"spark.sql.shuffle.partitions": "200"} | User-supplied configuration map                                      |
+
+These columns provide essential metadata for managing, auditing, and configuring pipelines in Databricks.
+
+
+The system.lakeflow.pipeline_update_timeline table in Databricks is a system table that tracks the pipeline updates, provides metadata metrics about 
+Lakeflow Spark Declarative Pipeline updates. 
+
+Here’s a breakdown of what, why, when, and how to use these metrics, fully aligned with Databricks best practices:
+
+**What is the system.lakeflow.pipeline_update_timeline table?**  
+This table records metadata about pipeline update events, such as when a pipeline update was started, completed, and its status. 
+It helps to track the lifecycle and performance of pipeline updates, including scheduling, execution, and any errors or issues encountered.
+
+**Why use metadata metrics from this table?**  
+- **Observability:** It enables to monitor pipeline health, performance, and reliability by providing a historical log of pipeline update events.
+- **Troubleshooting:** Identify failed updates, bottlenecks, or delays by analyzing update durations and statuses.
+- **Optimization:** By reviewing update timelines, tune pipeline schedules, cluster configurations, and resource allocation 
+for better cost and latency management.
+- **Compliance and Auditing:** The table provides an audit trail of pipeline operations, which is useful for governance and compliance reporting.
+
+**When should you use these metrics?**  
+- **Regular Monitoring:** Incorporate these metrics into observability dashboards to continuously monitor pipeline performance 
+and reliability[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/").
+- **After Pipeline Updates:** Review the table after running pipeline updates to verify successful completion and investigate
+any failures or anomalies[[2]](https://docs.databricks.com/aws/en/ldp/develop/ "/docs.databricks.com/aws/en/ldp/develop/").
+- **During Optimization Efforts:** Use the metrics when tuning pipeline schedules, cluster sizes, or troubleshooting performance issues.
+- **For Auditing:** Periodically review the table for compliance and operational audits.
+
+**How to use the metadata metrics from system.lakeflow.pipeline_update_timeline?**  
+1. **Query the Table:** Use Databricks SQL or notebooks to query the table for relevant columns 
+such as update start time, end time, status, and error messages.
+   ```sql
+   SELECT * FROM system.lakeflow.pipeline_update_timeline
+   WHERE pipeline_id = '<your_pipeline_id>'
+   ORDER BY update_start_time DESC;
+   ```
+2. **Analyze Update Durations:** Calculate the time taken for each update to identify slow or failed updates.
+3. **Monitor Statuses:** Filter for failed or incomplete updates to trigger alerts or initiate troubleshooting.
+4. **Integrate with Dashboards:** Visualize update timelines and statuses in Databricks dashboards for real-time monitoring.
+5. **Correlate with Other Metrics:** Combine with cluster utilization, throughput, and latency metrics for holistic pipeline observability[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/").
+
+**Best Practices:**
+- Regularly monitor pipeline update timelines alongside other key metrics (backpressure, throughput, duration, latency, cluster utilization) 
+for comprehensive observability[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/").
+- Use the table to inform predictive optimization and maintenance schedules, ensuring efficient resource use 
+and cost management[[2]](https://docs.databricks.com/aws/en/ldp/develop/ "/docs.databricks.com/aws/en/ldp/develop/").
+- Automate alerts for failed or delayed updates to enable proactive troubleshooting.
+
+By leveraging the system.lakeflow.pipeline_update_timeline table, ensure robust observability, efficient operations, 
+and compliance for Lakeflow Spark Declarative Pipelines in Databricks.
+
+The system.lakeflow.pipeline_update_timeline table in Databricks is a system table that tracks the pipeline updates, provides detailed metadata 
+about Lakeflow pipeline updates. 
+Here is a complete, accurate, and Databricks-aligned breakdown of all its columns, including explanations and clarifications for each[[1]]
+**Column Name** | **Data Type** | **Description & Clarification**
+--- | --- | ---
+`account_id` | string | The ID of the Databricks account that owns the pipeline. Useful for multi-account environments.
+`workspace_id` | string | The ID of the workspace where the pipeline resides. Ensures you can distinguish pipelines across workspaces.
+`pipeline_id` | string | The unique identifier for the pipeline within a workspace. Used to filter and analyze updates for a specific pipeline.
+`update_id` | string | The unique identifier for each pipeline update event within a workspace. Allows tracking of individual update attempts.
+`update_type` | string | The type of pipeline update (e.g., full refresh, incremental). For possible values, refer to Databricks documentation on pipeline update types.
+`request_id` | string | The ID of the request that initiated the update. Helps track retries or restarts of the same update.
+`run_as_user_name` | string | The email or service principal ID whose permissions were used for the update. Useful for auditing and access tracking.
+`trigger_type` | string | Indicates what triggered the update (e.g., schedule, manual, API). For possible values, see pipeline trigger type documentation.
+`trigger_details` | struct | Additional details about the trigger (e.g., schedule info, user info). For possible values, see pipeline trigger type details.
+`result_state` | string | The outcome of the pipeline update. For long-running updates split across multiple rows, this is only populated in the row representing the end of the update.
+`compute` | struct | Details about the compute resources used for the update (e.g., cluster info, resource allocation).
+`period_start_time` | timestamp | The UTC timestamp marking the start of the pipeline update or the start of the hour for long updates. Timezone info is included.
+`period_end_time` | timestamp | The UTC timestamp marking the end of the pipeline update or the end of the hour for long updates. Timezone info is included.
+`refresh_selection` | array | List of tables updated without a full refresh. Useful for understanding incremental update scope.
+`full_refresh_selection` | array | List of tables updated with a full refresh. Useful for tracking full data reloads.
+`reset_checkpoint_selection` | array | List of streaming flows for which checkpoints were cleared. Important for streaming pipeline troubleshooting.
+
+**Key Points:**
+- The table is immutable and complete at the time it is produced, ensuring reliable historical tracking.
+- Time columns (`period_start_time`, `period_end_time`) are sliced hourly for long-running updates, which helps with granular monitoring and troubleshooting.
+- The table supports both auditing (who ran what, when, and how) and operational monitoring (success/failure, resource usage, update types).
+
+**Example Query:**
+To get the daily pipeline update count for a workspace for the last 7 days:
+```sql
+SELECT
+  workspace_id,
+  COUNT(DISTINCT update_id) as update_count,
+  to_date(period_start_time) as date
+FROM system.lakeflow.pipeline_update_timeline
+WHERE period_start_time > CURRENT_TIMESTAMP() - INTERVAL 7 DAYS
+GROUP BY ALL
+```
+[[1]]
+
+This schema enables robust observability, troubleshooting, and optimization for Lakeflow pipeline operations in Databricks.
+
+Here is a breakdown of the columns in system.lakeflow.pipeline_update_timeline that address requirements, 
+fully aligned with Databricks documentation:
+
+1. **result_state**  
+   - **Description:** The outcome of the pipeline update.  
+   - **Details:** For updates running across more than 1 hour and split across multiple rows, this column is populated only in the row that represents the end of the update.  
+
+2. **compute**  
+   - **Description:** Details about the compute resource used in the pipeline update.  
+   - **Details:** This is a struct containing information such as cluster configuration and resource allocation used for the update[[1]]
+
+3. **period_start_time**  
+   - **Description:** The start time for the pipeline update or for the hour (for long updates).  
+   - **Details:** Stored as a UTC timestamp, with timezone information recorded at the end of the value.
+
+4. **period_end_time**  
+   - **Description:** The end time for the pipeline update or for the hour (for long updates).  
+   - **Details:** Also stored as a UTC timestamp, with timezone information.
+
+5. **trigger_type**  
+   - **Description:** What triggered this update (e.g., schedule, manual, API).  
+   - **Details:** For possible values, see Pipeline trigger type values in Databricks documentation[[1]].
+
+6. **trigger_details**  
+   - **Description:** The details of the pipeline's trigger.  
+   - **Details:** This is a struct with additional information about the trigger, such as schedule info or user info[[1]]
+
+7. **request_id**  
+   - **Description:** The ID of the request that initiated the update.  
+   - **Details:** Helps to understand how many times an update had to be retried or restarted[[1]]
+
+8. **run_as_user_name**  
+   - **Description:** The email of the user or the ID of the service principal whose permissions are used for the pipeline update.
+
+9. **update_type**  
+   - **Description:** The type of the pipeline update (e.g., full refresh, incremental)[[1]]
+
+10. **update_id**  
+    - **Description:** The ID of the pipeline update.  
+    - **Details:** Unique within a single workspace[[1]]
+
+11. **pipeline_id**  
+    - **Description:** The ID of the pipeline.  
+    - **Details:** Unique within a single workspace
+
+12. **workspace_id**  
+    - **Description:** The ID of the workspace this pipeline belongs to[[1]]
+
+**Example Query:**
+To retrieve all these details for successful pipeline updates, you can use:
+```sql
+SELECT
+  workspace_id,
+  pipeline_id,
+  update_id,
+  update_type,
+  run_as_user_name,
+  request_id,
+  trigger_type,
+  trigger_details,
+  compute,
+  period_start_time,
+  period_end_time,
+  result_state
+FROM system.lakeflow.pipeline_update_timeline
+WHERE result_state = 'COMPLETED'
+```
+[[1]]
+
+These columns provide comprehensive metadata for monitoring, auditing, and troubleshooting pipeline updates in Databricks.
+
+
+The **result_state** column in the `system.lakeflow.pipeline_update_timeline` table indicates the final outcome of a pipeline update. This is a key metric for understanding whether your pipeline update was successful, failed, or canceled.
+
+**Breakdown and Clarification:**
+
+- **What is result_state?**  
+  It is a string value that shows the final status of a pipeline update. Possible values include:
+  - `COMPLETED`: The pipeline update finished successfully.
+  - `FAILED`: The pipeline update encountered an error and did not finish successfully.
+  - `CANCELED`: The pipeline update was intentionally stopped before completion[[1]].
+
+- **How is result_state populated for long-running updates?**  
+  If a pipeline update runs for more than one hour, Databricks slices the update into hourly intervals and records each interval as a separate row in the table. However, the `result_state` column is only filled in the row that represents the end of the update. The intermediate rows (for each hour) will not have a value in `result_state`—only the final row will show whether the update was `COMPLETED`, `FAILED`, or `CANCELED`[[1]](https://docs.databricks.com/aws/en/admin/system-tables/jobs/ "/docs.databricks.com/aws/en/admin/system-tables/jobs/").
+
+- **Why is this important?**  
+  This design allows you to track the progress of long-running updates and only see the final outcome once the update is finished. When analyzing pipeline update history, always look for the row with a populated `result_state` to determine the final outcome of each update.
+
+**Example:**
+If a pipeline update takes 3 hours, you will see 3 rows for that update:
+- The first two rows (for the first and second hour) will have empty `result_state`.
+- The third row (for the last hour) will have `result_state` set to `COMPLETED`, `FAILED`, or `CANCELED`[[1]]
+
+This approach ensures accurate tracking and reporting of pipeline update outcomes, especially for long-running jobs.
+
+
+The values for the result_state in pipeline_update_timeline table. See https://docs.databricks.com/aws/en/admin/system-tables/jobs#pipeline-result-reference
+Return only 'COMPLETED'.
+
+The values for the update_type in the pipeline_update_timeline table. See https://docs.databricks.com/aws/en/admin/system-tables/jobs#pipeline-settings-reference
+
+The values for the trigger_type in the pipeline_update_timeline table. See https://docs.databricks.com/aws/en/admin/system-tables/jobs#pipeline-trigger-type-values
+
+The values for the trigger_type.job_task in the pipeline_update_timeline table. See https://docs.databricks.com/aws/en/admin/system-tables/jobs#pipeline-trigger-type-details
+
+The column-values in system.lakeflow.pipeline table:
+The value for workspace_id.
+The value for pipeline_id. 
+The values for the settings. The settings of the pipeline. See https://docs.databricks.com/aws/en/admin/system-tables/jobs#pipeline-settings-reference
+The values for the pipeline_type. See https://docs.databricks.com/aws/en/admin/system-tables/jobs#pipeline-type-values
+The value for name. The user-supplied name of the pipeline.
+The value for created_by.
+The value for run_as.
+The value for configuration. 
+
+To join the `system.lakeflow.pipeline_update_timeline` and `system.lakeflow.pipeline` tables in Databricks, 
+should use the `workspace_id` and `pipeline_id` columns as join keys, since these uniquely identify a pipeline within 
+a workspace and are present in both tables. This approach is fully aligned with Databricks best practices for system tables.
+
+Here’s an optimized and accurate example SQL query:
+
+```sql
+SELECT
+  put.workspace_id,
+  put.pipeline_id,
+  put.update_id,
+  put.update_type,
+  put.result_state,
+  put.period_start_time,
+  put.period_end_time,
+  put.trigger_type,
+  put.trigger_details,
+  put.request_id,
+  put.run_as_user_name,
+  put.compute,
+  p.name,
+  p.pipeline_type,
+  p.created_by,
+  p.run_as,
+  p.settings,
+  p.configuration
+FROM system.lakeflow.pipeline_update_timeline AS put
+INNER JOIN system.lakeflow.pipeline AS p
+  ON put.workspace_id = p.workspace_id
+  AND put.pipeline_id = p.pipeline_id
+```
+This query:
+- Uses an `INNER JOIN` for performance and accuracy, ensuring only matching pipeline updates and pipeline metadata are returned.
+- Selects relevant columns from both tables for comprehensive observability, auditing, and troubleshooting.
+- Is optimized for Databricks SQL, leveraging indexed system table columns.
+
+**Best practices:**
+- Always filter results as needed (e.g., by date, pipeline type, or result_state) to reduce data scanned and improve performance.
+- Use `INNER JOIN` unless specifically need unmatched records (then use `LEFT JOIN`).
+- Consider limiting columns to only those needed for analysis to optimize query execution.
+
+Further filter for successful pipeline updates, for example:
+```sql
+WHERE put.result_state = 'COMPLETED'
+```
+Add this clause to the query above for targeted results.
+
+This approach ensures a unified view of pipeline update events and their associated pipeline metadata, supporting robust 
+monitoring and governance in Databricks.
+
+
+To join the `system.lakeflow.pipeline_update_timeline` and `system.lakeflow.pipeline` tables and filter for pipeline updates 
+where `result_state = 'COMPLETED'`, should use `workspace_id` and `pipeline_id` as join keys. This ensures accuracy and 
+optimal performance, as these columns uniquely identify pipelines within a workspace and are indexed for efficient querying.
+
+Here is an optimized Databricks SQL query, fully aligned with Databricks best practices:
+
+```sql
+SELECT
+  put.workspace_id,
+  put.pipeline_id,
+  put.update_id,
+  put.update_type,
+  put.result_state,
+  put.period_start_time,
+  put.period_end_time,
+  put.trigger_type,
+  put.trigger_details,
+  put.request_id,
+  put.run_as_user_name,
+  put.compute,
+  p.name,
+  p.pipeline_type,
+  p.created_by,
+  p.run_as,
+  p.settings,
+  p.configuration
+FROM system.lakeflow.pipeline_update_timeline AS put
+INNER JOIN system.lakeflow.pipeline AS p
+  ON put.workspace_id = p.workspace_id
+  AND put.pipeline_id = p.pipeline_id
+WHERE put.result_state = 'COMPLETED'
+```
+This query:
+- Uses an `INNER JOIN` for performance and to ensure only matching records are returned.
+- Filters for updates that have completed successfully.
+- Selects relevant columns for comprehensive monitoring, auditing, and troubleshooting.
+- Is structured for clarity and maintainability, following Databricks SQL best practices.
+
+Further optimize by selecting only the columns need for specific use case, and by adding additional 
+filters (such as date ranges) to reduce the amount of data scanned and improve query performance.
+
+This approach provides a unified and accurate view of completed pipeline updates and their associated pipeline metadata, supporting 
+robust operational monitoring and governance in Databricks[[1]](https://docs.databricks.com/aws/en/ldp/develop/ "/docs.databricks.com/aws/en/ldp/develop/").
+
+TODO: Create an optimized and Databricks best-practice-aligned query that joins 
+system.lakeflow.pipeline_update_timeline, system.lakeflow.pipeline, system.compute.node_timeline, system.compute.node_types, 
+and system.compute.clusters—and filters for pipeline updates where result_state = 'COMPLETED'—follow these steps:
+
+Breakdown & Explanation
+
+1. Join Keys and Relationships
+
+system.lakeflow.pipeline_update_timeline and system.lakeflow.pipeline: Join on workspace_id and pipeline_id (these uniquely identify a pipeline within a workspace).
+system.lakeflow.pipeline_update_timeline and system.compute.clusters: Use the cluster identifier from the compute struct in pipeline_update_timeline to join with clusters.
+system.compute.clusters and system.compute.node_timeline: Join on cluster_id.
+system.compute.node_timeline and system.compute.node_types: Join on node_type_id.
+
+2. Filtering
+
+Only include rows where result_state = 'COMPLETED' to focus on successful pipeline updates.
+3. Optimization & Best Practices
+
+Select only the columns you need for analysis.
+Use explicit join conditions.
+Filter early in the query to reduce data scanned.
+
+Example Query
+
+Below is an optimized SQL query that demonstrates these best practices:
+
+[ TODO ]
+
+
+Databricks lakeflow declarative pipelines (LDP a framework for creating data pipelines, either batch or streaming in SQL and Python) offers more automation
+and less overhead. It is more managed experience (less a customization). For example, the transformations define to perform on data, and 
+Lakeflow Declarative Pipelines manages orchestration, monitoring, data quality, errors, and more.
+LDP a framework for developing and running batch and streaming data pipelines in SQL and Python. It has more extend capabilities and interoperable with open source Apache
+Spark Declarative Pipelines, while it is leveraged the performance-optimized Databricks Runtime.
+LDP API (flow) uses the same DataFrame API as Apache Spark and Structured Streaming.
+
+LDP API 
+More declarative programming paradigm in nature. It does not aligned more with the imperative/procedural programming patterns.
+Less command sequence that dictates how the data should be processed.
+Less step-by-step execution: explicitly defines the order of operations.
+Minimize the use of control structures: abstract loops, conditionals, and functions manage execution flow.
+Auto optimizations and performance tuning.
+Less customize in defining explicit steps/sequences of operations to process data.
+Focuses more on define what needs to be achieved, less requiring steps-structured approach/logic, leaving the underlying system to determine the best way to execute the task.
+Abstracts the how and focuses on defining the desired result.
+Avoid specifying step-by-step instructions.
+Simplify transformation logic, and the system auto-determines the most efficient execution plan.
+Abstraction of execution details: simply describe the desired outcome, not the steps to achieve it.
+Automatic optimization: system applies query planning and execution tuning.
+Reduced complexity: Removes the need for explicit control structures, improving maintainability.
+Leverage declarative programming, including domain-specific and functional programming paradigms.
+Automate key aspects of processing management, including orchestration, compute management, monitoring, data quality enforcement, and error handling.
+See https://docs.databricks.com/aws/en/ldp/ https://docs.databricks.com/aws/en/ldp/concepts
+
+Databricks recommends starting with the most managed. If it doesn't satisfy the requirements (for example, if it doesn't support data source), 
+drop down to the next layer. See the ELT stack https://docs.databricks.com/aws/en/ingestion/#-layers-of-the-etl-stack
+
+When designing data pipelines, must choose between procedural and declarative data processing models (frameworks). This decision impacts workflow complexity,
+maintainability, and efficiency. These models have key differences, advantages and challenges, and when to use each approach.
+
+Key differences: see https://docs.databricks.com/aws/en/data-engineering/procedural-vs-declarative#key-differences-procedural-vs-declarative-processing
+
+Use cases:
+High-level data processing frameworks such as pipelines.
+Scalable, distributed data workloads requiring automated optimizations.
+Enable the use cases include data ingestion from sources such as cloud storage (such as Amazon S3) and 
+message buses (such as Apache Kafka, Amazon Kinesis, Google Pub/Sub, Azure EventHub, and Apache Pulsar), and 
+incremental batch and streaming transformations.
+
+Core capabilities:
+Such as pipelines, streaming tables, and materialized views for data processing workflows.
+
+When to choose declarative processing: See https://docs.databricks.com/aws/en/data-engineering/procedural-vs-declarative#when-to-choose-procedural-or-declarative-processing
+
+Benefits of LDP: See https://docs.databricks.com/aws/en/ldp/concepts#what-are-the-benefits-of-sdp
+
+Limitations: See https://docs.databricks.com/aws/en/ldp/limitations
+
+Building with notebooks, JARs, or Python wheels.
+Examples:
+https://docs.databricks.com/aws/en/ldp/what-is-change-data-capture#examples-of-scd-type-1-and-type-2-processing-with-lakeflow-spark-declarative-pipelines
+https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/#automate-etl-with-lakeflow-spark-declarative-pipelines-and-auto-loader
+
+Build an ETL lakeflow declarative pipeline https://docs.databricks.com/aws/en/getting-started/data-pipeline-get-started
+
+Develop ldp using the Lakeflow Pipelines Editor https://docs.databricks.com/aws/en/ldp/multi-file-editor
+Develop ldp using the Notebook editor (legacy) https://docs.databricks.com/aws/en/ldp/notebook-devex
+Develop ldp using Lakeflow Spark Declarative Pipelines flows https://docs.databricks.com/aws/en/ldp/flows
+Develop ldp using Streaming tables https://docs.databricks.com/aws/en/ldp/streaming-tables
+Develop ldp using Materialized views https://docs.databricks.com/aws/en/ldp/materialized-views
+Develop ldp using Sinks https://docs.databricks.com/aws/en/ldp/ldp-sinks
+Develop ldp to load data https://docs.databricks.com/aws/en/ldp/load
+Develop ldp to load data from cloud object storage https://docs.databricks.com/aws/en/ldp/load#load-files-from-cloud-object-storage
+Develop ldp to load data from an existing table https://docs.databricks.com/aws/en/ldp/load#load-from-an-existing-table
+Develop ldp to load data from external systems https://docs.databricks.com/aws/en/ldp/load#load-data-from-external-systems
+Develop ldp to Transform data https://docs.databricks.com/aws/en/ldp/transform
+
+Implement data quality with LDP https://docs.databricks.com/aws/en/ldp/expectations
+
+Create pipelines using Python code -> Lakeflow Declarative Pipelines Python language reference
+https://docs.databricks.com/aws/en/ldp/developer/#python-development
+
+Configure ldp: See https://docs.databricks.com/aws/en/ldp/configure-pipeline
+
+Upload the sourcecode files in any format to a volume. Files uploaded through the Databricks UI can't exceed 5 GB per file.
+To upload files larger than 5 GB, use the Databricks SDK for Python.
+
+Upload using:
+Databricks SDK https://docs.databricks.com/aws/en/ingestion/file-upload/upload-to-volume#upload-using-the-databricks-sdk
+Databricks CLI https://docs.databricks.com/aws/en/ingestion/file-upload/upload-to-volume#upload-using-the-databricks-cli
+
+Schedule DLT pipeline:
+Job schedule adds a pipeline, creates a job for it. The ingestion pipeline is a task within the job. Optionally add more tasks to the job.
+https://docs.databricks.com/aws/en/assets/images/saas-connector-orchestration-18ab6ef96dab616bb8d5bfb122f33bd9.png
+
+Compute for ldp:
+A serverless for ldp pipeline https://docs.databricks.com/aws/en/ldp/serverless
+Serverless pipelines remove most configuration options, as Databricks manages all infrastructure. 
+See https://docs.databricks.com/aws/en/ldp/serverless#recommended-configuration-for-serverless-pipelines
+Serverless compute limitations https://docs.databricks.com/aws/en/compute/serverless/limitations
+A classic compute for ldp pipelines https://docs.databricks.com/aws/en/ldp/configure-compute
+
+
+Others to know about:
+
+Data history tracking (SCD type 2 & type 1):
+See https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/scd
+The history tracking setting, also known as the slowly changing dimensions (SCD) setting, determines how to handle changes in data over time.
+Turn history tracking off (SCD type 1) to overwrite outdated records as they're updated and deleted in the source. 
+Turn history tracking on (SCD type 2) to maintain a history of those changes. Deleting a table or column in the source does NOT delete that data
+from the destination, even when SCD type 1 is selected.
+
+How to ingest multiple objects into different schemas and how to ingest one object into multiple target tables?
+Pipeline maintaince, see https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/pipeline-maintenance
+Clarify, explain, breaks down what, why, when, how the vectorized query?
+
+Clarify, explain, breaks down what, why, when, how the higher-order functions? Make sure it is accurate all-aligned with Databricks.
+Higher-order functions in Databricks (specifically in Spark SQL and PySpark) are functions that take other functions as arguments or return them as results.
+They are powerful tools for working with complex data types, especially arrays and maps, enabling concise, expressive, and efficient data transformations.
+See https://docs.databricks.com/aws/en/semi-structured/higher-order-functions
+
+**What are higher-order functions?**  
+Higher-order functions operate on collections (like arrays or maps) and allow you to apply custom logic to each element, 
+filter elements, or aggregate results. Examples include `transform`, `filter`, `aggregate`, `exists`, and `reduce`. These functions can take 
+lambda expressions or user-defined functions as parameters.
+
+**Why use higher-order functions?**  
+- **Expressiveness:** They let you write complex data transformations in a concise way.
+- **Performance:** Operations are executed in parallel and optimized by Spark’s engine.
+- **Flexibility:** You can apply custom logic to nested or complex data structures without writing verbose code.
+
+**When should you use higher-order functions?**  
+- When working with nested data types (arrays, maps, structs) in DataFrames.
+- When you need to transform, filter, or aggregate elements within a collection column.
+- When you want to avoid writing UDFs (user-defined functions), which can be less efficient.
+
+**How do higher-order functions work in Databricks?**  
+- **In SQL:** You use built-in functions like `transform(array, x -> x + 1)`, `filter(array, x -> x > 10)`, or `aggregate(array, 0, (acc, x) -> acc + x)`.
+- **In PySpark:** You can use DataFrame methods or SQL expressions to apply these functions.
+
+**Example in Spark SQL:**
+```sql
+SELECT
+  transform(array(1, 2, 3), x -> x * 2) AS doubled
+```
+This returns `[2, 4, 6]` by applying the lambda `x -> x * 2` to each element.
+
+**Example in PySpark:**
+```python
+from pyspark.sql.functions import expr
+
+df = spark.createDataFrame([([1, 2, 3],)], ["numbers"])
+df.select(expr("transform(numbers, x -> x * 2) as doubled")).show()
+```
+This also returns `[2, 4, 6]`.
+
+**Summary:**  
+Higher-order functions in Databricks are essential for efficient, readable, and scalable data transformations on complex types. They are preferred 
+over UDFs for performance and integration with Spark’s optimization engine.
+
+------------------------------------------------------------
+DATABRICKS COMPUTE:
+See https://docs.databricks.com/aws/en/compute/
+
+Computing resources available on Databricks:
+1. Serverless compute for on-demand scaling.
+2. Non-serverless (aka classic compute) for customizable resources.
+
+Non-serverless (classic) Compute
+
+Non-serverless compute resources create, configure, and manage/deploy in LOB's AWS cloud account. They are NOT managed by Databricks.
+See [1]https://docs.databricks.com/aws/en/compute/configure
+
+Compute plan resources run in AWS account. New compute resources are created/provisioned within JPMC's VPC network in the org LOB's AWS account. See classic/nonserverless compute plane networking https://docs.databricks.com/aws/en/security/network/classic/.
+
+Classic/Non-serverless compute in Databricks can be used in different features, including:
+
+All-purpose compute
+Jobs compute
+Lakeflow Pipelines
+SQL Warehouse (pro and classic types), see https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types/
+
+Serverless Compute
+
+Serverless compute resources run in the compute plane which is managed by Databricks. See [1]https://docs.databricks.com/aws/en/compute/serverless/
+
+
+Databricks-managed service for on-demand computing resources. Automatically manage compute scales based workload needs.
+Databricks automatically upgrades the serverless compute runtime to support enhancements and upgrades to the platform.
+Databricks automatically deploys and manage the compute resources allocating.
+Workloads run without provisioning any compute resources in cloud (AWS VPC for JPMC) account.
+
+See [1]https://docs.databricks.com/aws/en/security/network/serverless-network-security/#serverless-compute-plane-networking-overview [2]https://docs.databricks.com/aws/en/security/network/serverless-network-security/#what-is-a-network-connectivity-configuration-ncc
+
+Serverless compute can be used in many different features in Databricks, such as:
+Serverless Lakeflow Pipelines, see https://docs.databricks.com/aws/en/ldp/serverless
+Serverless SQL warehouses, see https://docs.databricks.com/aws/en/compute/sql-warehouse/#what-is-serverless-sql
+Serverless jobs, see https://docs.databricks.com/aws/en/jobs/run-serverless-jobs
+Serverless GPU compute https://docs.databricks.com/aws/en/compute/serverless/gpu
+Serverless Machine Learning (Mosaic AI Model Training) - https://docs.databricks.com/aws/en/machine-learning/train-model/serverless-forecasting
+
+See more details about: compute types https://docs.databricks.com/aws/en/compute/choose-compute
+
+
+Compute Metrics
+
+The following metrics are NOT exposed in system metadata sources (tables), nor are they accessible via customer-managed storage. 
+Instead, Databricks stores them in Databricks-managed storage. This means they cannot retrieve these metrics directly from metadata level; 
+must use the Databricks UI compute metrics tool to view them. See https://docs.databricks.com/aws/en/compute/cluster-metrics#hardware-metric-charts
+
+CPU Utilization Metrics:
+iowait: Measures the time the CPU spends waiting for I/O operations (like disk or network) to complete.
+irq: Time spent handling hardware interrupt requests.
+nice: Time used by processes with a positive "niceness" value, which means they have lower priority compared to other tasks.
+softirq: Time spent handling software interrupt requests.
+
+Memory Utilization and Swap Metrics:
+buffer: Memory used by kernel buffers, which temporarily store data being transferred between devices and processes.
+cached: Memory used by the file system cache at the OS level, which helps speed up file access by keeping frequently accessed data in memory.
+
+See more details: [[1]]https://docs.databricks.com/aws/en/compute/cluster-metrics#hardware-metric-charts [2]https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/
+
+Compute System Metadata Sources (Tables)
+They include:
+- **clusters:** Records the full history of compute configurations over time for non-serverless compute resources, including Lakeflow Pipelines compute.
+It tracks details like cluster creation, deletion, node types, and ownership.
+
+- **node_types:** Contains a single record for each available node type, including hardware information. This helps to understand what instance types 
+are available and their specifications.
+
+- **node_timeline:** Captures minute-by-minute records of compute utilization metrics for each instance (node) in non-serverless compute.
+Each row-record represents one minute of resource usage for a specific node, including CPU, memory, and network metrics.
+
+See [[1]]https://docs.databricks.com/aws/en/admin/system-tables/compute [2]https://docs.databricks.com/aws/en/admin/system-tables/compute#cluster-table-schema [3]https://docs.databricks.com/aws/en/admin/system-tables/compute#node-timeline-table-schema
+
+NOTE: 
+Serverless compute pipeline uses two performance modes, either 'optimized' or 'standard' performance modes: Standard performance mode is designed
+to reduce costs for workloads where a slightly higher launch latency is acceptable. While the optimized performance mode is enabled faster startup
+and execution for time-sensitive workloads. Both modes use the same SKU, but standard performance mode consumes fewer DBUs, reflecting lower compute usage.
+See [1]https://docs.databricks.com/aws/en/ldp/serverless#select-a-performance-mode
+
+Non-serverless compute pipeline has two associated compute resources: an update cluster that processes pipeline updates and a maintenance cluster that
+runs daily maintenance tasks (including predictive optimization). 
+See [1]https://docs.databricks.com/aws/en/ldp/configure-compute#configure-separate-settings-for-the-update-and-maintenance-clusters
+
+- **Non-serverless Lakeflow Pipelines:** There are two associated compute resources:
+  - **Update cluster:** Processes pipeline updates.
+  - **Maintenance cluster:** Runs daily maintenance tasks, including predictive optimization.
+
+- **Serverless Pipeline Performance Modes:**
+  - **Standard performance mode:** Reduces costs with slightly higher launch latency and lower DBU consumption.
+  - **Optimized performance mode:** Enables faster startup and execution for time-sensitive workloads, but with higher DBU consumption.
+Both modes use the same SKU, but differ in resource usage and cost.
+
+**Scope and Limitations:**
+- The compute metadata sources (tables) **only include records for non-serverless compute** (non-serverless Lakeflow pipelines). They **do not contain records for serverless compute**, including serverless Lakeflow Pipelines.
+
+- **Nodes that ran for less than 10 minutes might not appear in the node_timeline** due to data collection granularity.
+
+- **Serverless Lakeflow Pipelines:** When running serverless pipelines, compute instance types—Databricks manages all infrastructure. Most configuration options are removed, and compute metadata do NOT track these compute instance type resources.
+
+See [1]https://docs.databricks.com/aws/en/admin/system-tables/compute#known-limitations [2]https://docs.databricks.com/aws/en/ldp/configure-pipeline [3]https://docs.databricks.com/aws/en/ldp/serverless
+
+**Summary Table:**
+
+| Table Name      | Description | Applies to Non-Serverless | Applies to Serverless |
+|-----------------|-------------|--------------------------|----------------------|
+| clusters        | Compute config history | Yes | No |
+| node_types      | Node type hardware info | Yes | No |
+| node_timeline   | Per-minute utilization metrics | Yes | No |
+
+
+**References to Documentation:**
+- The details above are supported by the Databricks documentation on compute system tables, Lakeflow pipeline configuration, and serverless pipeline 
+performance modes[[1]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/").
+
+Confirm, clarify, breakdown, explain. Make sure the accurate and well-aligned with Databricks documentation.
+
+Confirm, clarify, breakdown, explain, outline the approach option(s).
+
+TODO: 
+Add https://docs.databricks.com/aws/en/ldp/where-is-dlt https://docs.databricks.com/aws/en/ldp/developer/python-ref#dlt-or-pipeline
+The product formerly known as Delta Live Tables (DLT) has been updated to Lakeflow Spark Declarative Pipelines (SDP).
+Add the billing usage and list_price metadata sources.
+Databricks bills based on Databricks units (DBUs), which are units of processing capability per hour based on VM instance type.
+See https://docs.databricks.com/aws/en/getting-started/concepts#billing-databricks-units-dbus
+Pipelines
+Lakeflow Spark Declarative Pipelines provide a declarative framework for building reliable, maintainable, and testable data processing pipelines.
+See Lakeflow Spark Declarative Pipelines https://docs.databricks.com/aws/en/ldp/
+Workspace
+A workspace is an environment for accessing all of your Databricks assets. 
+A workspace organizes objects (notebooks, libraries, dashboards, and experiments) into folders and provides access to data objects and computational resources.
+See https://docs.databricks.com/aws/en/getting-started/concepts#workspace
+Serverless compute, you can't customize the cluster size or instance type. Serverless compute is automatically scaled based on your workload requirements.
+Using the system table system.billing.usage. Data profiling is billed under a serverless jobs SKU but does not require your account to be enabled 
+for serverless compute for workflows. See https://docs.databricks.com/aws/en/data-quality-monitoring/data-profiling/expense#view-usage-from-the-system-table-systembillingusage
+Choose from serverless compute for on-demand scaling, classic compute for customizable resources, or SQL warehouses for optimized analytics.
+See https://docs.databricks.com/aws/en/compute/
+There are two types of compute planes depending on the compute that uses in Databricks.
+Serverless compute resources run in a serverless compute plane in Databricks account.
+Classic compute resources runs in your AWS account in what is called the classic compute plane. This refers to the network in your AWS account and its resources.
+See https://docs.databricks.com/aws/en/getting-started/high-level-architecture#workspace-architecture https://docs.databricks.com/aws/en/admin/workspace/#what-is-a-workspace
+Connect a cloud storage S3 & Databricks Workspace. See https://docs.databricks.com/aws/en/admin/workspace/serverless-workspaces#using-data-in-your-cloud-storage
+Classic compute (any compute that is not serverless)
