@@ -288,7 +288,42 @@ and detail of its output can help better shape Claude's performance.
 For example, instead of "Create an analytics dashboard", use "Create an analytics dashboard. Include as many relevant features and interactions as possible. Go beyond the basics to create a fully-featured implementation."
 Request specific features explicitly: Animations and interactive elements should be requested explicitly when desired.
 
+Quick Start for Coding 
+Ask question 
+Let’s start with understanding your codebase. Try one of these commands:
 
+what does this project do?
+
+Claude will analyze your files and provide a summary. You can also ask more specific questions:
+
+what technologies does this project use?
+
+where is the main entry point?
+
+explain the folder structure
+
+You can also ask Claude about its own capabilities:
+
+what can Claude Code do?
+
+how do I create custom skills in Claude Code?
+
+can Claude Code work with Docker?
+
+Claude Code reads your files as needed - you don’t have to manually add context. 
+Claude also has access to its own documentation and can answer questions about its features and capabilities.
+​
+Make code change:
+
+Now let’s make Claude Code do some actual coding. Try a simple task:
+
+add a hello world function to the main file
+
+Claude Code will:
+Find the appropriate file
+Show you the proposed changes
+Ask for your approval
+Make the edit
 
 Claude Code
 Explore first, then plan, then code
