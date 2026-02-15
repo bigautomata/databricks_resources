@@ -40,6 +40,62 @@ This query:
 
 You can further customize the query to include additional columns or filter for specific pipelines or users[[1]](https://docs.databricks.com/aws/en/ldp/monitor-event-logs/ "/docs.databricks.com/aws/en/ldp/monitor-event-logs/")[[2]](https://docs.databricks.com/aws/en/admin/usage/system-tables/ "/docs.databricks.com/aws/en/admin/usage/system-tables/").
 
+To join the `system.lakeflow.pipeline_update_timeline` metadata with billing usage and billing list prices metadata using pandas, you should:
+
+- Use `workspace_id` and `pipeline_id` from `pipeline_update_timeline_df` and `usage_metadata.dlt_pipeline_id` from `billing_usage_df` as join keys.
+- Join `billing_usage_df` with `billing_list_prices_df` using `sku_name` and `cloud`.
+- Filter for relevant time ranges and product types (e.g., `billing_origin_product == 'DLT'`).
+
+Here is optimized pandas code aligned with Databricks best practices:
+
+```python
+import pandas as pd
+
+# Filter billing usage for DLT pipelines
+billing_usage_dlt = billing_usage_df[
+    billing_usage_df['billing_origin_product'] == 'DLT'
+]
+
+# Join pipeline_update_timeline with billing_usage
+merged = pd.merge(
+    pipeline_update_timeline_df,
+    billing_usage_dlt,
+    left_on=['workspace_id', 'pipeline_id'],
+    right_on=['workspace_id', 'usage_metadata.dlt_pipeline_id'],
+    how='inner'
+)
+
+# Join with billing_list_prices on sku_name and cloud
+merged = pd.merge(
+    merged,
+    billing_list_prices_df,
+    left_on=['sku_name', 'cloud'],
+    right_on=['sku_name', 'cloud'],
+    how='left'
+)
+
+# Optionally, filter for relevant time ranges
+# For example, only keep records where usage_date is within the pipeline update period
+merged = merged[
+    (merged['usage_date'] >= merged['period_start_time']) &
+    (merged['usage_date'] <= merged['period_end_time'])
+]
+
+# Calculate estimated cost
+merged['estimated_cost'] = merged['usage_quantity'] * merged['pricing.default']
+
+# Select relevant columns for analysis
+result = merged[[
+    'workspace_id', 'pipeline_id', 'update_id', 'period_start_time', 'period_end_time',
+    'result_state', 'usage_date', 'sku_name', 'usage_quantity', 'pricing.default', 'estimated_cost'
+]]
+
+# Display the result
+print(result)
+```
+This code ensures efficient joins, filters, and calculations, following Databricks best practices for pandas DataFrame operations. Adjust column names as needed for your actual DataFrames.
+
+
 To join the `system.lakeflow.pipeline_update_timeline` metadata with billing usage, billing list prices, and compute metadata (`node_types`, `clusters`, and `node_timeline`), you need to use the relevant keys and time ranges that connect these system tables. Here’s a breakdown and example SQL to clarify the process:
 
 ### 1. **Pipeline Update Timeline Metadata**
