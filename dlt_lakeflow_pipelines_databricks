@@ -40,6 +40,93 @@ This query:
 
 You can further customize the query to include additional columns or filter for specific pipelines or users[[1]](https://docs.databricks.com/aws/en/ldp/monitor-event-logs/ "/docs.databricks.com/aws/en/ldp/monitor-event-logs/")[[2]](https://docs.databricks.com/aws/en/admin/usage/system-tables/ "/docs.databricks.com/aws/en/admin/usage/system-tables/").
 
+To join the `system.lakeflow.pipeline_update_timeline` metadata with billing usage, billing list prices, and compute metadata (`node_types`, `clusters`, and `node_timeline`), you need to use the relevant keys and time ranges that connect these system tables. Here’s a breakdown and example SQL to clarify the process:
+
+### 1. **Pipeline Update Timeline Metadata**
+- Table: `system.lakeflow.pipeline_update_timeline`
+- Key columns: `workspace_id`, `pipeline_id`, `update_id`
+- Contains: Pipeline update events, user info, trigger type, result state, compute details[[1]](https://docs.databricks.com/aws/en/admin/system-tables/jobs/ "/docs.databricks.com/aws/en/admin/system-tables/jobs/").
+
+### 2. **Billing Usage and List Prices**
+- Table: `system.billing.usage`
+  - Key columns: `workspace_id`, `usage_metadata.dlt_pipeline_id` (for DLT pipelines), `sku_name`, `usage_start_time`, `usage_end_time`
+- Table: `system.billing.list_prices`
+  - Key columns: `sku_name`, `cloud`, `price_start_time`, `price_end_time`
+- Contains: Usage records and pricing for compute resources.
+
+### 3. **Compute Metadata**
+- Table: `system.compute.node_timeline`
+  - Key columns: `workspace_id`, `cluster_id`, `instance_id`, `start_time`, `end_time`
+  - Contains: Node-level resource utilization (CPU, memory, network, disk) per minute[[2]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/").
+- Table: `system.compute.clusters`
+  - Key columns: `cluster_id`, `workspace_id`
+  - Contains: Cluster configuration and ownership.
+- Table: `system.compute.node_types`
+  - Key columns: `node_type`
+  - Contains: Node type details.
+
+---
+
+## **Example SQL Join**
+
+Below is an example SQL query that demonstrates how to join these tables to analyze pipeline updates, associated billing, pricing, and compute resource utilization:
+
+```sql
+SELECT
+  p.workspace_id,
+  p.pipeline_id,
+  p.update_id,
+  p.period_start_time,
+  p.period_end_time,
+  p.result_state,
+  p.run_as_user_name,
+  u.usage_date,
+  u.sku_name,
+  u.usage_quantity,
+  u.billing_origin_product,
+  lp.pricing.default AS list_price,
+  u.usage_quantity * lp.pricing.default AS estimated_cost,
+  nt.cluster_id,
+  nt.instance_id,
+  nt.start_time,
+  nt.end_time,
+  nt.cpu_user_percent,
+  nt.mem_used_percent,
+  nt.node_type
+FROM system.lakeflow.pipeline_update_timeline p
+LEFT JOIN system.billing.usage u
+  ON p.workspace_id = u.workspace_id
+  AND p.pipeline_id = u.usage_metadata.dlt_pipeline_id
+  AND u.billing_origin_product = 'DLT'
+  AND u.usage_date BETWEEN to_date(p.period_start_time) AND to_date(p.period_end_time)
+LEFT JOIN system.billing.list_prices lp
+  ON u.sku_name = lp.sku_name
+  AND u.cloud = lp.cloud
+  AND u.usage_date >= lp.price_start_time
+  AND (lp.price_end_time IS NULL OR u.usage_date <= lp.price_end_time)
+LEFT JOIN system.compute.node_timeline nt
+  ON p.workspace_id = nt.workspace_id
+  AND nt.start_time >= p.period_start_time
+  AND nt.end_time <= p.period_end_time
+-- Optionally join with clusters and node_types for more details
+-- LEFT JOIN system.compute.clusters c ON nt.cluster_id = c.cluster_id
+-- LEFT JOIN system.compute.node_types ntype ON nt.node_type = ntype.node_type
+WHERE p.period_start_time > CURRENT_TIMESTAMP() - INTERVAL 30 DAYS
+```
+[[2]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/")[[1]](https://docs.databricks.com/aws/en/admin/system-tables/jobs/ "/docs.databricks.com/aws/en/admin/system-tables/jobs/")
+
+---
+
+### **Clarification**
+- **Keys:** The join uses `workspace_id` and `pipeline_id` for pipeline updates and billing usage, and `cluster_id` for compute metadata.
+- **Time Range:** The join ensures compute and billing records are within the pipeline update period.
+- **Node Utilization:** `node_timeline` provides CPU, memory, and network stats for the compute resources used by the pipeline.
+- **Pricing:** `list_prices` gives the default price for each SKU, allowing cost calculation.
+
+---
+
+### **Summary**
+This join enables you to analyze each pipeline update with its associated billing usage, pricing, and detailed compute resource utilization, providing a comprehensive view of operational and financial metrics for declarative pipelines in Databricks[[2]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/")[[1]](https://docs.databricks.com/aws/en/admin/system-tables/jobs/ "/docs.databricks.com/aws/en/admin/system-tables/jobs/").
 
 
 Here are best practices for effective communication with Claude:
