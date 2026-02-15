@@ -332,6 +332,75 @@ print(result)
 ```
 [[1]](https://docs.databricks.com/aws/en/ldp/developer/python-dev/ "/docs.databricks.com/aws/en/ldp/developer/python-dev/")[[2]](https://docs.databricks.com/aws/en/ldp/developer/python-ref/ "/docs.databricks.com/aws/en/ldp/developer/python-ref/")
 
+To analyze the association between Lakeflow Declarative Pipelines (formerly DLT) pipeline update timelines and billing, pricing, and compute resource utilization, you need to join several Databricks system tables:
+
+1. **Pipeline Update Timeline**:  
+   - Table: `system.lakeflow.pipeline_update_timeline`
+   - Contains metadata for each pipeline update, including `pipeline_id`, `update_id`, `compute` (details about compute resources), and timestamps[[1]](https://docs.databricks.com/aws/en/admin/system-tables/jobs/ "/docs.databricks.com/aws/en/admin/system-tables/jobs/").
+
+2. **Billing Usage**:  
+   - Table: `system.billing.usage`
+   - Contains billing records, including `usage_metadata.dlt_pipeline_id` (pipeline ID), `sku_name`, `usage_date`, `usage_quantity` (DBU consumption), and compute SKU information[[2]](https://docs.databricks.com/aws/en/admin/usage/system-tables/ "/docs.databricks.com/aws/en/admin/usage/system-tables/")[[3]](https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/monitor-costs/ "/docs.databricks.com/aws/en/ingestion/lakeflow-connect/monitor-costs/")[[4]](https://docs.databricks.com/aws/en/ldp/monitor-event-logs/ "/docs.databricks.com/aws/en/ldp/monitor-event-logs/").
+
+3. **Billing List Prices (Cost Estimates)**:  
+   - Table: `system.billing.list_prices`
+   - Contains SKU pricing information, which can be joined on `sku_name` to estimate costs.
+
+4. **Compute Metadata**:  
+   - The `compute` column in `system.lakeflow.pipeline_update_timeline` contains details about the compute resources used, such as node types, clusters, and node timeline[[1]](https://docs.databricks.com/aws/en/admin/system-tables/jobs/ "/docs.databricks.com/aws/en/admin/system-tables/jobs/").
+
+### Example SQL Query
+
+Here’s a template to join these tables and retrieve the desired information for each pipeline update:
+
+```sql
+SELECT
+  t.pipeline_id,
+  t.update_id,
+  t.period_start_time,
+  t.period_end_time,
+  t.compute.node_types AS node_types,
+  t.compute.clusters AS clusters,
+  t.compute.node_timeline AS node_timeline,
+  b.sku_name,
+  b.usage_date,
+  SUM(b.usage_quantity) AS dbu_usage,
+  p.list_price AS sku_list_price,
+  SUM(b.usage_quantity * p.list_price) AS estimated_cost
+FROM system.lakeflow.pipeline_update_timeline t
+LEFT JOIN system.billing.usage b
+  ON b.usage_metadata.dlt_pipeline_id = t.pipeline_id
+  AND b.usage_start_time >= t.period_start_time
+  AND b.usage_end_time <= t.period_end_time
+LEFT JOIN system.billing.list_prices p
+  ON b.sku_name = p.sku_name
+GROUP BY
+  t.pipeline_id,
+  t.update_id,
+  t.period_start_time,
+  t.period_end_time,
+  t.compute.node_types,
+  t.compute.clusters,
+  t.compute.node_timeline,
+  b.sku_name,
+  b.usage_date,
+  p.list_price
+ORDER BY t.period_start_time DESC
+```
+- This query links each pipeline update to its billing usage, cost estimates, and compute metadata.
+- Adjust the date range and pipeline IDs as needed for your analysis.
+
+**Notes:**
+- The `compute` struct in the timeline table provides detailed information about the compute resources used for each update, including node types and cluster configuration[[1]](https://docs.databricks.com/aws/en/admin/system-tables/jobs/ "/docs.databricks.com/aws/en/admin/system-tables/jobs/").
+- Billing usage is tracked per pipeline update and can be aggregated by date, SKU, or other dimensions[[2]](https://docs.databricks.com/aws/en/admin/usage/system-tables/ "/docs.databricks.com/aws/en/admin/usage/system-tables/")[[3]](https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/monitor-costs/ "/docs.databricks.com/aws/en/ingestion/lakeflow-connect/monitor-costs/")[[4]](https://docs.databricks.com/aws/en/ldp/monitor-event-logs/ "/docs.databricks.com/aws/en/ldp/monitor-event-logs/").
+- List prices are estimates; actual costs may vary based on negotiated rates or discounts.
+
+**References:**  
+- [Monitor costs using system tables][[2]](https://docs.databricks.com/aws/en/admin/usage/system-tables/ "/docs.databricks.com/aws/en/admin/usage/system-tables/")
+- [Monitor managed ingestion pipeline cost][[3]](https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/monitor-costs/ "/docs.databricks.com/aws/en/ingestion/lakeflow-connect/monitor-costs/")
+- [Pipeline event log: Query the cost of a pipeline update][[4]](https://docs.databricks.com/aws/en/ldp/monitor-event-logs/ "/docs.databricks.com/aws/en/ldp/monitor-event-logs/")
+- [Pipeline update timeline table schema][[1]](https://docs.databricks.com/aws/en/admin/system-tables/jobs/ "/docs.databricks.com/aws/en/admin/system-tables/jobs/")
+
 
 Here are best practices for effective communication with Claude:
 
