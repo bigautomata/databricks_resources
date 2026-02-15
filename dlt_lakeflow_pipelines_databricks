@@ -128,6 +128,71 @@ WHERE p.period_start_time > CURRENT_TIMESTAMP() - INTERVAL 30 DAYS
 ### **Summary**
 This join enables you to analyze each pipeline update with its associated billing usage, pricing, and detailed compute resource utilization, providing a comprehensive view of operational and financial metrics for declarative pipelines in Databricks[[2]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/")[[1]](https://docs.databricks.com/aws/en/admin/system-tables/jobs/ "/docs.databricks.com/aws/en/admin/system-tables/jobs/").
 
+Here’s how you can join these DataFrames in Python using pandas. Assume you have the following DataFrames:
+
+- `pipeline_update_timeline_df` (from `system.lakeflow.pipeline_update_timeline`)
+- `billing_usage_df` (from `system.billing.usage`)
+- `billing_list_prices_df` (from `system.billing.list_prices`)
+- `node_timeline_df` (from `system.compute.node_timeline`)
+- `clusters_df` (from `system.compute.clusters`)
+- `node_types_df` (from `system.compute.node_types`)
+
+Below is an example of how to perform the joins:
+
+```python
+import pandas as pd
+
+# Join pipeline_update_timeline with billing_usage
+merged1 = pd.merge(
+    pipeline_update_timeline_df,
+    billing_usage_df,
+    left_on=['workspace_id', 'pipeline_id'],
+    right_on=['workspace_id', 'usage_metadata.dlt_pipeline_id'],
+    how='left'
+)
+
+# Join with billing_list_prices
+merged2 = pd.merge(
+    merged1,
+    billing_list_prices_df,
+    left_on=['sku_name', 'cloud'],
+    right_on=['sku_name', 'cloud'],
+    how='left'
+)
+
+# Join with node_timeline
+merged3 = pd.merge(
+    merged2,
+    node_timeline_df,
+    left_on=['workspace_id'],
+    right_on=['workspace_id'],
+    how='left'
+)
+
+# Join with clusters
+merged4 = pd.merge(
+    merged3,
+    clusters_df,
+    left_on=['cluster_id'],
+    right_on=['cluster_id'],
+    how='left'
+)
+
+# Join with node_types
+final_merged = pd.merge(
+    merged4,
+    node_types_df,
+    left_on=['node_type'],
+    right_on=['node_type'],
+    how='left'
+)
+
+# Now final_merged contains all joined metadata
+```
+This code assumes the relevant columns exist in your DataFrames. You may need to adjust column names and add time range filters as needed for your use case. For example, you can filter rows based on `period_start_time` and `period_end_time` before joining with `node_timeline_df` to ensure only relevant compute records are included.
+
+Let me know if you want a more detailed example with sample data or additional filtering!
+
 
 Here are best practices for effective communication with Claude:
 
