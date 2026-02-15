@@ -1,4 +1,48 @@
- Here are best practices for effective communication with Claude:
+To join the `system.lakeflow.pipeline_update_timeline` metadata with billing usage and billing list prices metadata in Databricks, you need to:
+
+- Use `pipeline_id` from `pipeline_update_timeline` and `usage_metadata.dlt_pipeline_id` from `system.billing.usage` as the join key.
+- Join `system.billing.usage` with `system.billing.list_prices` using `sku_name` and the relevant time range.
+- Filter for `billing_origin_product='DLT'` to focus on declarative pipelines.
+
+Here’s an example SQL query that demonstrates this join:
+
+```sql
+SELECT
+  t1.workspace_id,
+  t1.pipeline_id,
+  t1.update_id,
+  t1.period_start_time,
+  t1.period_end_time,
+  t1.result_state,
+  t2.usage_date,
+  t2.sku_name,
+  t2.usage_quantity,
+  t2.billing_origin_product,
+  t3.pricing.default AS list_price,
+  t2.usage_quantity * t3.pricing.default AS estimated_cost
+FROM system.lakeflow.pipeline_update_timeline t1
+LEFT JOIN system.billing.usage t2
+  ON t1.workspace_id = t2.workspace_id
+  AND t1.pipeline_id = t2.usage_metadata.dlt_pipeline_id
+  AND t2.billing_origin_product = 'DLT'
+  AND t2.usage_date BETWEEN to_date(t1.period_start_time) AND to_date(t1.period_end_time)
+LEFT JOIN system.billing.list_prices t3
+  ON t2.sku_name = t3.sku_name
+  AND t2.usage_end_time >= t3.price_start_time
+  AND (t3.price_end_time IS NULL OR t2.usage_end_time < t3.price_end_time)
+WHERE t1.period_start_time > CURRENT_TIMESTAMP() - INTERVAL 30 DAYS
+```
+This query:
+- Retrieves pipeline update timeline metadata.
+- Joins with billing usage records for DLT pipelines.
+- Joins with list price metadata to calculate estimated cost.
+- Filters for updates in the last 30 days.
+
+You can further customize the query to include additional columns or filter for specific pipelines or users[[1]](https://docs.databricks.com/aws/en/ldp/monitor-event-logs/ "/docs.databricks.com/aws/en/ldp/monitor-event-logs/")[[2]](https://docs.databricks.com/aws/en/admin/usage/system-tables/ "/docs.databricks.com/aws/en/admin/usage/system-tables/").
+
+
+
+Here are best practices for effective communication with Claude:
 
 **Be Explicit with Instructions**
 
