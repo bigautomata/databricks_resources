@@ -250,6 +250,89 @@ This code assumes the relevant columns exist in your DataFrames. You may need to
 Let me know if you want a more detailed example with sample data or additional filtering!
 
 
+Here is optimized pandas code for joining the DataFrames as described, following Databricks engineering and best practices:
+
+- Use explicit column selection to minimize memory usage.
+- Filter early to reduce join size.
+- Use inner joins where possible for performance.
+- Calculate cost after joining billing usage and list prices.
+- Align join keys with Databricks system table conventions.
+
+```python
+import pandas as pd
+
+# Filter billing usage for DLT pipelines before joining
+billing_usage_dlt = billing_usage_df[
+    billing_usage_df['billing_origin_product'] == 'DLT'
+]
+
+# Join pipeline_update_timeline with billing_usage on workspace_id and pipeline_id
+merged = pd.merge(
+    pipeline_update_timeline_df,
+    billing_usage_dlt,
+    left_on=['workspace_id', 'pipeline_id'],
+    right_on=['workspace_id', 'usage_metadata.dlt_pipeline_id'],
+    how='inner'
+)
+
+# Join with billing_list_prices on sku_name and cloud
+merged = pd.merge(
+    merged,
+    billing_list_prices_df,
+    left_on=['sku_name', 'cloud'],
+    right_on=['sku_name', 'cloud'],
+    how='left'
+)
+
+# Filter node_timeline for relevant time range before joining
+node_timeline_filtered = node_timeline_df[
+    (node_timeline_df['start_time'] >= merged['period_start_time'].min()) &
+    (node_timeline_df['end_time'] <= merged['period_end_time'].max())
+]
+
+# Join with node_timeline on workspace_id
+merged = pd.merge(
+    merged,
+    node_timeline_filtered,
+    left_on=['workspace_id'],
+    right_on=['workspace_id'],
+    how='left'
+)
+
+# Join with clusters on cluster_id
+merged = pd.merge(
+    merged,
+    clusters_df,
+    left_on=['cluster_id'],
+    right_on=['cluster_id'],
+    how='left'
+)
+
+# Join with node_types on node_type
+merged = pd.merge(
+    merged,
+    node_types_df,
+    left_on=['node_type'],
+    right_on=['node_type'],
+    how='left'
+)
+
+# Calculate estimated cost
+merged['estimated_cost'] = merged['usage_quantity'] * merged['pricing.default']
+
+# Select relevant columns for analysis
+result = merged[[
+    'workspace_id', 'pipeline_id', 'update_id', 'period_start_time', 'period_end_time',
+    'result_state', 'usage_date', 'sku_name', 'usage_quantity', 'pricing.default', 'estimated_cost',
+    'cluster_id', 'instance_id', 'start_time', 'end_time', 'cpu_user_percent', 'mem_used_percent', 'node_type'
+]]
+
+# Display the result
+print(result)
+```
+[[1]](https://docs.databricks.com/aws/en/ldp/developer/python-dev/ "/docs.databricks.com/aws/en/ldp/developer/python-dev/")[[2]](https://docs.databricks.com/aws/en/ldp/developer/python-ref/ "/docs.databricks.com/aws/en/ldp/developer/python-ref/")
+
+
 Here are best practices for effective communication with Claude:
 
 **Be Explicit with Instructions**
