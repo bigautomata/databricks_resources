@@ -2,20 +2,18 @@ The following metadata details (values) are missing which are required for pipel
 
 Cost billing usage and list prices metadata
 workspace_id (NOT NULL) -- ID of the workspace this usage associated with.
-
+record_type (NOT NULL) -- The record is original, a retraction, or a restatement. See https://docs.databricks.com/aws/en/admin/system-tables/billing#record-type
 usage_start_time (NOT NULL) -- The start time for this usage record.
 usage_start_time >= price_start_time
 usage_start_time < price_end_time
 usage_end_time (NOT NULL) -- The end time for this usage record.
 usage_date (NOT NULL) -- Date of the usage record, this field can be used for faster aggregation by date.
-usage_quantity -- Number of units consumed for this usage
+usage_quantity (NOT NULL) != 0 -- Having number of the units consumed for this usage
 SUM(usage_quantity * pricing.effective_list.default) AS total_dbu_cost_usd
-usage_type (NOT NULL) -- The type of usage attributed to the product or workload for billing purposes.
-
-ingestion_date (NOT NULL) -- Date the record loaded into the usage table.
-record_type (NOT NULL) -- The record is original, a retraction, or a restatement. See https://docs.databricks.com/aws/en/admin/system-tables/billing#record-type
 billing_origin_product (NOT NULL) -- The product that originated the usage. See https://docs.databricks.com/aws/en/admin/system-tables/billing#billing-origin-product-reference
+usage_type (NOT NULL) -- The type of usage attributed to the product or workload for billing purposes.
 product_features (NOT NULL) -- Details about the specific product features used. See https://docs.databricks.com/aws/en/admin/system-tables/billing#features
+ingestion_date (NOT NULL) -- Date the record loaded into the usage table.
 
 -- The values in usage_metadata are all strings that tell about the workspace objects and resources involved in the usage.
 -- NOTE: Depending on the compute type and features used, only a subset of these values is populated in any given usage. 
