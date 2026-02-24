@@ -1,6 +1,67 @@
+DLT Under-Utilization & Over-Provisioning Audit
+
+WITH node_metrics AS (
+  SELECT
+    ntl.cluster_id,
+    ntl.driver,
+    ntl.timestamp,
+    nt.core_count,
+    nt.memory_mb,
+    -- Derived Absolute Metrics
+    ((ntl.cpu_user_percent + ntl.cpu_system_percent) / 100.0) * nt.core_count AS actual_cpu_cores_used,
+    (ntl.mem_used_percent / 100.0) * nt.memory_mb AS actual_mem_mb_used,
+    -- Telemetry
+    ntl.cpu_user_percent,
+    ntl.cpu_system_percent,
+    ntl.cpu_wait_percent,
+    ntl.mem_used_percent,
+    ntl.mem_swap_percent,
+    ntl.network_transmit_bytes,
+    ntl.network_receive_bytes
+  FROM system.compute.node_timeline ntl
+  JOIN system.compute.clusters c ON ntl.cluster_id = c.cluster_id
+  JOIN system.compute.node_types nt ON 
+    (ntl.driver = true AND c.driver_node_type_id = nt.node_type_id) OR 
+    (ntl.driver = false AND c.node_type_id = nt.node_type_id)
+)
+SELECT
+    p.name AS pipeline_name,
+    put.update_id,
+    nm.driver AS is_driver,
+    -- Under-Utilization Logic
+    CASE 
+        WHEN MAX(nm.cpu_user_percent + nm.cpu_system_percent) < 15 AND MAX(nm.mem_used_percent) < 30 
+        THEN 'UNDERUTILIZED (Over-Provisioned)'
+        WHEN MAX(nm.cpu_user_percent + nm.cpu_system_percent) > 85 
+        THEN 'HIGH LOAD (Correctly Sized or Under-Sized)'
+        ELSE 'OPTIMIZED'
+    END AS resource_efficiency_check,
+    
+    -- CPU Stats
+    ROUND(AVG(nm.actual_cpu_cores_used), 2) AS avg_cpu_cores_active,
+    MAX(nm.cpu_user_percent + nm.cpu_system_percent) AS max_total_cpu_pct,
+    AVG(nm.cpu_wait_percent) AS avg_cpu_wait_pct,
+    
+    -- Memory Stats
+    ROUND(AVG(nm.actual_mem_mb_used), 2) AS avg_mem_mb_used,
+    MAX(nm.mem_used_percent) AS max_mem_used_pct,
+    MAX(nm.mem_swap_percent) AS max_swap_pct,
+    
+    -- Network Totals
+    SUM(nm.network_transmit_bytes) AS total_sent_bytes,
+    SUM(nm.network_receive_bytes) AS total_received_bytes
+
+FROM system.lakeflow.pipeline_update_timeline put
+JOIN system.lakeflow.pipelines p ON put.pipeline_id = p.pipeline_id
+JOIN node_metrics nm ON put.cluster_id = nm.cluster_id
+WHERE put.result_state = 'COMPLETED'
+  AND nm.timestamp BETWEEN put.start_time AND put.end_time
+GROUP BY ALL
+ORDER BY max_total_cpu_pct ASC;
+
 The following metadata details (values) are missing which are required for pipelines compute specific (per pipeline) in Databricks:
 
-Cost billing usage and list prices metadata
+Compute billing usage and list prices metadata
 workspace_id (NOT NULL) -- ID of the workspace this usage associated with.
 record_type (NOT NULL) -- The record is original, a retraction, or a restatement. See https://docs.databricks.com/aws/en/admin/system-tables/billing#record-type
 usage_start_time (NOT NULL) -- The start time for this usage record.
@@ -18,10 +79,17 @@ ingestion_date (NOT NULL) -- Date the record loaded into the usage table.
 -- The values in usage_metadata are all strings that tell about the workspace objects and resources involved in the usage.
 -- NOTE: Depending on the compute type and features used, only a subset of these values is populated in any given usage. 
 usage_metadata (NOT NULL) -- System-provided metadata reference about the usage, including IDs for compute resources i.e., cluster id, node type, dlt_pipeline_id. See https://docs.databricks.com/aws/en/admin/system-tables/billing#usage-metadata-reference
-usage_metadata.cluster_id (NOT NULL) -- ID of the cluster associated with the usage
+usage_metadata.cluster_id (NOT NULL) -- ID of the cluster associated with the usage.
 usage_metadata.node_type (NOT NULL) -- Instance type of the compute resource.
 usage_metadata.dlt_pipeline_id? -- ID of the declarative pipeline associated with the usage.
 usage_metadata.dlt_update_id AS billing_update_id? -- ID of the pipeline update associated with the usage.
+
+-- Pricing info at the published list price rate. The price rates may be changed between months. 
+-- NOTE: For cost estimation, must NOT include any promotional represents a temporary promotional price for cost estimation.
+price_start_time (NOT NULL) -- The time this price became effective.
+price_end_time (NOT NULL) -- The time this price stopped being effective.
+pricing.default (NOT NULL) AS default_price -- The default price always a single price that can be used for long-term estimates.
+pricing.effective_list.default (NOT NULL) -- The effective list price used for calculating the cost. 
 
 Splitting driver and worker computes:
 
