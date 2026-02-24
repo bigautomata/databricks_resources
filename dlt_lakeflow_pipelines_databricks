@@ -12,7 +12,6 @@ usage_quantity -- Number of units consumed for this usage
 SUM(usage_quantity * pricing.effective_list.default) AS total_dbu_cost_usd
 usage_type (NOT NULL) -- The type of usage attributed to the product or workload for billing purposes.
 
-
 ingestion_date (NOT NULL) -- Date the record loaded into the usage table.
 record_type (NOT NULL) -- The record is original, a retraction, or a restatement. See https://docs.databricks.com/aws/en/admin/system-tables/billing#record-type
 billing_origin_product (NOT NULL) -- The product that originated the usage. See https://docs.databricks.com/aws/en/admin/system-tables/billing#billing-origin-product-reference
