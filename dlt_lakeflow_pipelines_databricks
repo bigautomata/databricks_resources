@@ -2,14 +2,16 @@ The following metadata details (values) are missing which are required for pipel
 
 Cost billing usage and list prices metadata
 workspace_id (NOT NULL) -- ID of the workspace this usage associated with.
-usage_type (NOT NULL) -- The type of usage attributed to the product or workload for billing purposes.
-usage_quantity -- Number of units consumed for this usage
-SUM(usage_quantity * pricing.effective_list.default) AS total_dbu_cost_usd
-usage_start_time (NOT NULL) -- The start time for this usage record
+
+usage_start_time (NOT NULL) -- The start time for this usage record.
 usage_start_time >= price_start_time
 usage_start_time < price_end_time
-usage_end_time (NOT NULL) -- The end time for this usage record
-usage_date (NOT NULL) -- Date of the usage record, this field can be used for faster aggregation by date
+usage_end_time (NOT NULL) -- The end time for this usage record.
+usage_date (NOT NULL) -- Date of the usage record, this field can be used for faster aggregation by date.
+usage_quantity -- Number of units consumed for this usage
+SUM(usage_quantity * pricing.effective_list.default) AS total_dbu_cost_usd
+usage_type (NOT NULL) -- The type of usage attributed to the product or workload for billing purposes.
+
 
 ingestion_date (NOT NULL) -- Date the record loaded into the usage table.
 record_type (NOT NULL) -- The record is original, a retraction, or a restatement. See https://docs.databricks.com/aws/en/admin/system-tables/billing#record-type
@@ -21,7 +23,7 @@ product_features (NOT NULL) -- Details about the specific product features used.
 usage_metadata (NOT NULL) -- System-provided metadata reference about the usage, including IDs for compute resources i.e., cluster id, node type, dlt_pipeline_id. See https://docs.databricks.com/aws/en/admin/system-tables/billing#usage-metadata-reference
 usage_metadata.cluster_id (NOT NULL) -- ID of the cluster associated with the usage
 usage_metadata.node_type (NOT NULL) -- Instance type of the compute resource.
-usage_metadata.dlt_pipeline_id -- ID of the declarative pipeline associated with the usage.
+usage_metadata.dlt_pipeline_id? -- ID of the declarative pipeline associated with the usage.
 usage_metadata.dlt_update_id AS billing_update_id? -- ID of the pipeline update associated with the usage.
 
 Splitting driver and worker computes:
@@ -77,7 +79,6 @@ result_state = 'COMPLETED'
 cluster_id AS pipeline_cluster_id
 pipeline_id
 pipeline_type = 'ETL_PIPELINE'
-
 
 
 Add a join to system.billing.usage and system.billing.list_prices that billing_origin_product is ETL specific to 
