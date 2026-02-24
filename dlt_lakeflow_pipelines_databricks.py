@@ -95,19 +95,22 @@ pricing.effective_list.default (NOT NULL) AS effective_price -- The effective li
 Splitting driver and worker computes:
 
 Compute clusters metadata
-cluster_id  -- ID of the cluster for which pipeline record is associated
-cluster_name -- Name for the cluster
-create_time AS cluster_created_time?
-delete_time AS cluster_deleted_time?
-driver_node_type -- Driver node type name i.e., i3.xlarge
-worker_node_type -- Worker node type name i.e., i4.xlarge
+cluster_id (NOT NULL) -- ID of the cluster for which pipeline record is associated.
+cluster_name -- Name for the cluster.
+create_time (NOT NULL) AS cluster_created_time?
+delete_time (NOT NULL) AS cluster_deleted_time -- If the cluster is still active or has not been deleted, there is no deletion event to record, so the value remains null. 
+See https://docs.databricks.com/aws/en/admin/system-tables/compute#cluster-table-schema
+
+driver_node_type (NOT NULL) -- Driver node type name i.e., i3.xlarge
+worker_node_type (NOT NULL) -- Worker node type name i.e., i4.xlarge
 worker_count -- Number of workers. Defined for fixed-size clusters only
 min_autoscale_workers -- The set minimum number of workers. This field is valid only for autoscaling clusters
 max_autoscale_workers -- The set maximum number of workers. This field is valid only for autoscaling clusters
+
 auto_termination_minutes -- The configured autotermination duration
-cluster_source -- Source of the cluster. Pipelines are PIPELINE or PIPELINE_MAINTENANCE
+cluster_source (NOT NULL) -- Source of the cluster. Pipelines are PIPELINE or PIPELINE_MAINTENANCE
 aws_attributes -- AWS specific settings
-dbr_version -- The Databricks Runtime of the cluster i.e., 17.x-snapshot-scala2.13
+dbr_version (NOT NULL) -- The Databricks Runtime of the cluster i.e., 17.x-snapshot-scala2.13
 change_time AS cluster_change_time? -- Timestamp of change to the compute definition i.e., 2026-01-09 11:00:00.000
 change_date AS cluster_change_date? -- Change date. Used for retention i.e., 2023-01-09
 
