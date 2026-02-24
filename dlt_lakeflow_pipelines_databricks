@@ -59,8 +59,8 @@ WHERE put.result_state = 'COMPLETED'
 GROUP BY ALL
 ORDER BY max_total_cpu_pct ASC;
 
-The following metadata details (values) are missing which are required for pipelines compute specific (per pipeline) in Databricks:
 
+The following metadata details (values) are missing which are required for pipelines compute specific (per pipeline) in Databricks:
 Compute billing usage and list prices metadata
 workspace_id (NOT NULL) -- ID of the workspace this usage associated with.
 record_type (NOT NULL) -- The record is original, a retraction, or a restatement. See https://docs.databricks.com/aws/en/admin/system-tables/billing#record-type
@@ -89,7 +89,8 @@ usage_metadata.dlt_update_id AS billing_update_id? -- ID of the pipeline update 
 price_start_time (NOT NULL) -- The time this price became effective.
 price_end_time (NOT NULL) -- The time this price stopped being effective.
 pricing.default (NOT NULL) AS default_price -- The default price always a single price that can be used for long-term estimates.
-pricing.effective_list.default (NOT NULL) -- The effective list price used for calculating the cost. 
+pricing.effective_list.default (NOT NULL) AS effective_price -- The effective list price used for calculating the cost. 
+
 
 Splitting driver and worker computes:
 
