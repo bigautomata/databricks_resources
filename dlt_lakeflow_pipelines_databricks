@@ -1,3 +1,163 @@
+The following metadata details are missing which are required for pipelines compute specific (per pipeline) in Databricks:
+
+Splitting driver and worker computes:
+
+Compute clusters metadata
+cluster_id  -- ID of the cluster for which pipeline record is associated
+cluster_name -- Name for the cluster
+create_time AS cluster_created_time?
+delete_time AS cluster_deleted_time?
+driver_node_type -- Driver node type name i.e., i3.xlarge
+worker_node_type -- Worker node type name i.e., i4.xlarge
+worker_count -- Number of workers. Defined for fixed-size clusters only
+min_autoscale_workers -- The set minimum number of workers. This field is valid only for autoscaling clusters
+max_autoscale_workers -- The set maximum number of workers. This field is valid only for autoscaling clusters
+auto_termination_minutes -- The configured autotermination duration
+cluster_source -- Source of the cluster. Pipelines are PIPELINE or PIPELINE_MAINTENANCE
+aws_attributes -- AWS specific settings
+dbr_version -- The Databricks Runtime of the cluster i.e., 17.x-snapshot-scala2.13
+change_time AS cluster_change_time? -- Timestamp of change to the compute definition i.e., 2026-01-09 11:00:00.000
+change_date AS cluster_change_date? -- Change date. Used for retention i.e., 2023-01-09
+
+
+Compute node types metadata
+node_type -- Unique identifier for node type i.e., i3.xlarge
+core_count -- Number of vCPUs for the instance i.e., 48.0
+memory_mb -- Total memory for the instance i.e., 393216
+
+
+Compute node-level resources utilization metadata
+instance_id AS compute_node_instance_id? -- ID for the specific instance
+cluster_id AS compute_node_cluster_id? -- ID of the compute resource
+
+MAX(cpu_user_percent + cpu_system_percent) AS max_cpu_used_pct -- max total percentage of time the compute cpu used/spent in the userland/application + kernel/system
+MAX(cpu_system_percent) AS max_cpu_user_pct? -- max percentage of time the CPU spent in userland (application).
+MAX(cpu_system_percent) AS max_cpu_system_pct? -- max percentage of time the CPU spent in the kernel (non-application/user)
+MAX(cpu_wait_percent) AS max_cpu_wait_pct? -- max percentage of time the CPU spent waiting for I/O
+
+MAX(mem_used_percent) AS max_mem_used_pct -- max percentage of the compute's memory used during the time period (including memory used by background processes running on the compute)
+MAX(mem_swap_percent) AS max_mem_swap_pct? -- max percentage of memory usage attributed to memory swap
+
+MAX(network_sent_bytes + network_received_bytes) AS max_network_bytes?
+MAX(network_sent_bytes) AS max_network_sent_bytes?
+MAX(network_received_bytes) AS max_network_received_bytes?
+
+MIX
+
+AVG(cpu_wait_percent) AS avg_cpu_wait_pct -- average percentage of time the compute cpu time spent waiting for I/O
+
+
+Pipeline metadata
+update_id AS pipeline_update_id
+result_state = 'COMPLETED'
+cluster_id AS pipeline_cluster_id
+pipeline_id
+pipeline_type = 'ETL_PIPELINE'
+
+Cost billing usage and list prices metadata
+usage_metadata.dlt_update_id AS billing_update_id,
+usage_metadata.dlt_update_id IS NOT NULL,
+usage_start_time >= price_start_time
+SUM(usage_quantity * pricing.effective_list.default) AS total_cost_usd
+usage_start_time < price_end_time
+
+Add a join to system.billing.usage and system.billing.list_prices that billing_origin_product is ETL specific to 
+calculate exactly how much money is being "wasted" on these underutilized runs?
+
+To calculate the financial impact of over-provisioning, join the billing and pricing system tables with the compute metrics/telemetrics. 
+In the logic below, "Wasted Cost" is defined as the proportional cost incurred when a pipeline never exceeds a 
+"Safe Peak" (defined here as 25% CPU or 40% Memory). If a pipeline stays below these thresholds, calculate the percentage of 
+the DBU cost that was spent on idle headroom.
+
+ETL Pipeline: Wasted Cost Analysis (Under-Utilization Audit)
+
+WITH pipeline_billing AS (
+  -- Aggregating ETL/DLT costs per update
+  SELECT 
+    u.usage_metadata.dlt_update_id AS update_id,
+    u.usage_unit,
+    SUM(u.usage_quantity) AS total_dbus,
+    SUM(u.usage_quantity * lp.pricing.effective_list.default) AS total_cost_usd
+  FROM system.billing.usage u
+  JOIN system.billing.list_prices lp 
+    ON u.sku_name = lp.sku_name
+  WHERE u.billing_origin_product = 'DLT' -- DLT is the product origin for ETL Pipelines
+    AND u.usage_metadata.dlt_update_id IS NOT NULL
+    AND u.usage_start_time >= lp.price_start_time 
+    AND (lp.price_end_time IS NULL OR u.usage_start_time < lp.price_end_time)
+  GROUP BY ALL
+),
+node_telemetry AS (
+  -- Aggregating peak utilization per node role per update
+  SELECT
+    ntl.cluster_id,
+    ntl.driver,
+    MAX(ntl.cpu_user_percent + ntl.cpu_system_percent) AS max_cpu_util_pct,
+    MAX(ntl.mem_used_percent) AS max_mem_util_pct,
+    AVG(ntl.cpu_wait_percent) AS avg_cpu_wait_pct
+  FROM system.compute.node_timeline ntl
+  GROUP BY ALL
+)
+SELECT
+    p.name AS pipeline_name,
+    put.update_id,
+    c.driver_node_type_id,
+    c.node_type_id AS worker_node_type_id,
+    
+    -- Financials
+    ROUND(pb.total_dbus, 2) AS dbus_consumed,
+    ROUND(pb.total_cost_usd, 2) AS actual_cost_usd,
+    
+    -- Peak Utilization
+    MAX(CASE WHEN nt.driver THEN nt.max_cpu_util_pct END) AS driver_peak_cpu_pct,
+    MAX(CASE WHEN NOT nt.driver THEN nt.max_cpu_util_pct END) AS worker_peak_cpu_pct,
+    
+    -- Waste Calculation Logic
+    -- If Peak CPU < 25% and Peak Mem < 40%, we estimate 50% of the cost is "Waste" 
+    -- due to over-provisioned instance sizing.
+    CASE 
+      WHEN MAX(nt.max_cpu_util_pct) < 25 AND MAX(nt.max_mem_util_pct) < 40 
+      THEN ROUND(pb.total_cost_usd * 0.50, 2) 
+      ELSE 0 
+    END AS estimated_waste_usd,
+
+    CASE 
+      WHEN MAX(nt.max_cpu_util_pct) < 25 AND MAX(nt.max_mem_util_pct) < 40 THEN 'CRITICAL: OVER-PROVISIONED'
+      WHEN MAX(nt.max_cpu_util_pct) < 10 THEN 'GHOST RUN: NEAR ZERO UTILIZATION'
+      ELSE 'OPTIMIZED'
+    END AS efficiency_status
+
+FROM system.lakeflow.pipeline_update_timeline put
+JOIN system.lakeflow.pipelines p ON put.pipeline_id = p.pipeline_id
+JOIN system.compute.clusters c ON put.cluster_id = c.cluster_id
+JOIN pipeline_billing pb ON put.update_id = pb.update_id
+JOIN node_telemetry nt ON put.cluster_id = nt.cluster_id
+
+WHERE put.result_state = 'COMPLETED'
+  AND p.pipeline_type = 'ETL_PIPELINE'
+  
+GROUP BY ALL
+HAVING estimated_waste_usd > 0
+ORDER BY estimated_waste_usd DESC;
+
+Technical Breakdown of the "Waste" Check 
+	1	Product Alignment: Use billing_origin_product = 'DLT' because all Lakeflow/ETL pipeline activity under the DLT product family.
+	2	The Over-Provisioning Threshold:
+	◦	Max CPU < 25%: If the application code never stresses more than a quarter of the available cores, the instance is too large.
+	◦	Max Memory < 40%: Databricks/Spark requires headroom for overhead, but if 60% of compute RAM is untouched, result paying for "ghost" memory.
+	3	Wasted USD Calculation:
+	◦	The query applies a conservative 50% waste multiplier to the total cost for runs that fail both thresholds. This represents the potential 
+savings if you were to downsize the instance type (e.g., from an m5.4xlarge to an m5.2xlarge).
+	4	Ghost Runs: The status GHOST RUN identifies pipelines that triggered, spun up a cluster, and finished with almost no work done—often 
+caused by scheduled triggers on empty source folders. 
+
+Recommendation for Next Steps 
+	•	Right-sizing: For pipelines flagged as CRITICAL, look at the worker_node_type_id and move one "size" down (e.g., Standard_DS4_v2 to Standard_DS3_v2).
+	•	Autoscale Tuning: If the cost is high but the worker peak is low, check if your min_workers is set too high, forcing the cluster to stay large even when the workload is light. 
+Would you like me to aggregate this by pipeline_name over the last 30 days to show you the total monthly "Lost Dollars" per project?
+
+
+
 To join the `system.lakeflow.pipeline_update_timeline` metadata with billing usage and billing list prices metadata in Databricks, you need to:
 
 - Use `pipeline_id` from `pipeline_update_timeline` and `usage_metadata.dlt_pipeline_id` from `system.billing.usage` as the join key.
