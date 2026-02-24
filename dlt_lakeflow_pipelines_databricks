@@ -1,4 +1,4 @@
-The following metadata details are missing which are required for pipelines compute specific (per pipeline) in Databricks:
+The following metadata details (values) are missing which are required for pipelines compute specific (per pipeline) in Databricks:
 
 Splitting driver and worker computes:
 
@@ -55,11 +55,31 @@ pipeline_id
 pipeline_type = 'ETL_PIPELINE'
 
 Cost billing usage and list prices metadata
-usage_metadata.dlt_update_id AS billing_update_id,
-usage_metadata.dlt_update_id IS NOT NULL,
+workspace_id IS NOT NULL -- ID of the workspace this usage associated with
+
+usage_quantity -- Number of units consumed for this usage
+SUM(usage_quantity * pricing.effective_list.default) AS total_dbu_cost_usd
+usage_start_time IS NOT NULL -- The start time for this usage record
 usage_start_time >= price_start_time
-SUM(usage_quantity * pricing.effective_list.default) AS total_cost_usd
 usage_start_time < price_end_time
+usage_end_time IS NOT NULL -- The end time for this usage record
+usage_date IS NOT NULL -- Date of the usage record, this field can be used for faster aggregation by date
+
+-- The values in usage_metadata are all strings that tell about the workspace objects and resources involved in the usage.
+-- NOTE: Depending on the compute type and features used, only a subset of these values is populated in any given usage. 
+usage_metadata -- System-provided metadata reference about the usage, including IDs for compute resources i.e., cluster id, node type, dlt_pipeline_id. See https://docs.databricks.com/aws/en/admin/system-tables/billing#usage-metadata-reference
+usage_metadata.cluster_id IS NOT NULL -- ID of the cluster associated with the usage
+usage_metadata.node_type -- The instance type of the compute resource
+usage_metadata.dlt_pipeline_id IS NOT NULL -- ID of the declarative pipeline associated with the usage
+usage_metadata.dlt_update_id (IS NOT NULL) AS billing_update_id -- ID of the pipeline update associated with the usage
+
+
+ingestion_date -- Date the record loaded into the usage table
+billing_origin_product
+product_features
+usage_type -- The type of usage attributed to the product or workload for billing purposes. 
+
+
 
 Add a join to system.billing.usage and system.billing.list_prices that billing_origin_product is ETL specific to 
 calculate exactly how much money is being "wasted" on these underutilized runs?
