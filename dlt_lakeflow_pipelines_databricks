@@ -59,8 +59,8 @@ workspace_id (IS NOT NULL) -- ID of the workspace this usage associated with.
 ingestion_date (IS NOT NULL) -- Date the record loaded into the usage table.
 billing_origin_product (IS NOT NULL) -- The product that originated the usage. See https://docs.databricks.com/aws/en/admin/system-tables/billing#billing-origin-product-reference
 product_features (IS NOT NULL) -- Details about the specific product features used. See https://docs.databricks.com/aws/en/admin/system-tables/billing#features
-usage_type (IS NOT NULL) -- The type of usage attributed to the product or workload for billing purposes. 
-
+usage_type (IS NOT NULL) -- The type of usage attributed to the product or workload for billing purposes.
+record_type (NOT NULL) -- The record is original, a retraction, or a restatement. See https://docs.databricks.com/aws/en/admin/system-tables/billing#record-type
 
 usage_quantity -- Number of units consumed for this usage
 SUM(usage_quantity * pricing.effective_list.default) AS total_dbu_cost_usd
@@ -73,8 +73,8 @@ usage_date (IS NOT NULL) -- Date of the usage record, this field can be used for
 -- The values in usage_metadata are all strings that tell about the workspace objects and resources involved in the usage.
 -- NOTE: Depending on the compute type and features used, only a subset of these values is populated in any given usage. 
 usage_metadata (IS NOT NULL) -- System-provided metadata reference about the usage, including IDs for compute resources i.e., cluster id, node type, dlt_pipeline_id. See https://docs.databricks.com/aws/en/admin/system-tables/billing#usage-metadata-reference
-usage_metadata.cluster_id (IS NOT NULL) -- ID of the cluster associated with the usage
-usage_metadata.node_type (IS NOT NULL) -- Instance type of the compute resource.
+usage_metadata.cluster_id (NOT NULL) -- ID of the cluster associated with the usage
+usage_metadata.node_type (NOT NULL) -- Instance type of the compute resource.
 usage_metadata.dlt_pipeline_id -- ID of the declarative pipeline associated with the usage.
 usage_metadata.dlt_update_id AS billing_update_id? -- ID of the pipeline update associated with the usage.
 
