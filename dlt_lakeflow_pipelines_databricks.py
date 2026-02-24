@@ -93,33 +93,30 @@ pricing.effective_list.default (NOT NULL) AS effective_price -- The effective li
 
 
 Splitting driver and worker computes:
-
 Compute clusters metadata
 cluster_id (NOT NULL) -- ID of the cluster for which pipeline record is associated.
 cluster_name -- Name for the cluster.
-create_time (NOT NULL) AS cluster_created_time?
-delete_time (NOT NULL) AS cluster_deleted_time -- If the cluster is still active or has not been deleted, there is no deletion event to record, so the value remains null. 
+create_time (NOT NULL) AS cluster_created_time -- Timestamp of the change to the compute definition.
+delete_time (NOT NULL) AS cluster_deleted_time -- Timestamp of when the cluster was deleted. If the cluster is still active or has not been deleted, there is no deletion event to record, so the value remains null. 
 See https://docs.databricks.com/aws/en/admin/system-tables/compute#cluster-table-schema
 
 driver_node_type (NOT NULL) -- Driver node type name i.e., i3.xlarge
 worker_node_type (NOT NULL) -- Worker node type name i.e., i4.xlarge
-worker_count -- Number of workers. Defined for fixed-size clusters only
-min_autoscale_workers -- The set minimum number of workers. This field is valid only for autoscaling clusters
-max_autoscale_workers -- The set maximum number of workers. This field is valid only for autoscaling clusters
+worker_count -- Number of workers. Defined for fixed-size clusters only.
+min_autoscale_workers -- The set minimum number of workers. This field is valid only for autoscaling clusters.
+max_autoscale_workers -- The set maximum number of workers. This field is valid only for autoscaling clusters.
 
-auto_termination_minutes -- The configured autotermination duration
+auto_termination_minutes -- The configured autotermination duration i.e., bigint 120.
 cluster_source (NOT NULL) -- Source of the cluster. Pipelines are PIPELINE or PIPELINE_MAINTENANCE
 aws_attributes -- AWS specific settings
 dbr_version (NOT NULL) -- The Databricks Runtime of the cluster i.e., 17.x-snapshot-scala2.13
 change_time AS cluster_change_time? -- Timestamp of change to the compute definition i.e., 2026-01-09 11:00:00.000
-change_date AS cluster_change_date? -- Change date. Used for retention i.e., 2023-01-09
-
+change_date AS (NOT NULL) cluster_change_date -- Change date. Used for retention i.e., 2023-01-09
 
 Compute node types metadata
-node_type -- Unique identifier for node type i.e., i3.xlarge
-core_count -- Number of vCPUs for the instance i.e., 48.0
-memory_mb -- Total memory for the instance i.e., 393216
-
+node_type (NOT NULL) -- Unique identifier for node type i.e., i3.xlarge
+core_count (NOT NULL) -- Number of vCPUs for the instance i.e., 48.0
+memory_mb (NOT NULL) -- Total memory for the instance i.e., 393216
 
 Compute node-level resources utilization metadata
 instance_id AS compute_node_instance_id? -- ID for the specific instance
