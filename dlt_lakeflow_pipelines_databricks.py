@@ -1,3 +1,16 @@
+Use system tables: system.compute.node_timeline, system.lakeflow.pipeline_update_timeline and result_state is COMPLETED,
+system.lakeflow.pipelines, system.billing.usage,
+system.compute.clusters,
+system.compute.node_types.
+Identify the utilization of compute resources such as cpu, memory, driver and workers node_type, autoscale, auto termination,
+dbr version, cluster_source PIPELINE, core_count, memory_mb, cpu_user_percent, cpu_system_percent, cpu_wait_percent, mem_used_percent, 
+mem_swap_percent, network bytes, driver for running pipelines.
+
+Insights to Look For 
+	•	Low CPU/Mem Usage: If avg_cpu_user and avg_mem_used are consistently below 20-30%, consider down-sizing the node_type_id or reducing the max_workers in the autoscale settings.
+	•	High Swap Usage: If mem_swap_percent is high, nodes are running out of RAM, leading to significant performance degradation (spilling to disk).
+
+Autoscale Efficiency: Compare the min_workers and max_workers against the actual number of nodes active in the node_timeline to see if the cluster is scaling up unnecessarily. 
 To analyze the utilization and configuration of compute resources dedicated to (LakeFlow) pipelines, need to join the operational metrics 
 from node_timeline with the metadata from pipelines and clusters. The following query provides a comprehensive view of resource
 consumption (CPU/Memory) alongside cluster configurations for pipeline updates:
