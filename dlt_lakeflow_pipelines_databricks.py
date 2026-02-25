@@ -1,3 +1,156 @@
+To analyze the utilization and configuration of compute resources dedicated to (LakeFlow) pipelines, need to join the operational metrics 
+from node_timeline with the metadata from pipelines and clusters. The following query provides a comprehensive view of resource
+consumption (CPU/Memory) alongside cluster configurations for pipeline updates:
+
+SELECT
+    p.pipeline_name,
+    put.pipeline_id,
+    put.update_id,
+    c.cluster_name,
+    c.cluster_source,
+    c.driver_node_type_id,
+    c.node_type_id AS worker_node_type_id,
+    c.spark_version AS dbr_version,
+    c.autoscale.min_workers,
+    c.autoscale.max_workers,
+    c.autotermination_minutes,
+    nt.core_count,
+    nt.memory_mb,
+    -- Aggregated Metrics from Node Timeline
+    AVG(ntm.cpu_user_percent) AS avg_cpu_user,
+    AVG(ntm.cpu_system_percent) AS avg_cpu_system,
+    AVG(ntm.cpu_wait_percent) AS avg_cpu_wait,
+   AVG(ntm.mem_used_percent) AS avg_mem_used,
+
+AVG(ntm.mem_swap_percent) AS avg_mem_swap,
+SUM(ntm.network_receive_bytes + ntm.network_transmit_bytes) AS total_network_bytes
+FROM system.lakeflow.pipeline_update_timeline put
+JOIN system.lakeflow.pipelines p 
+    ON put.pipeline_id = p.pipeline_id
+JOIN system.compute.clusters c 
+    ON put.cluster_id = c.cluster_id
+JOIN system.compute.node_types nt 
+    ON c.node_type_id = nt.node_type_id
+JOIN system.compute.node_timeline ntm 
+    ON put.cluster_id = ntm.cluster_id
+WHERE put.result_state = 'COMPLETED'
+  AND c.cluster_source = 'PIPELINE'
+  -- Ensuring we only look at metrics within the update duration
+  AND ntm.timestamp BETWEEN put.start_time AND put.end_time
+GROUP BY ALL
+ORDER BY put.end_time DESC;
+
+Key data elements explained:
+cpu_user_percent, mem_used_percent
+Reveals if the pipeline is over-provisioned (low %) or bottlenecked (high %).
+
+Hardware Specs
+core_count, memory_mb
+Fetched from node_types to understand the physical limits of the nodes
+
+Efficiency
+cpu_wait_percent
+High values here usually indicate I/O bottlenecks or waiting for data from external sources.
+
+
+To calculate the dollar amount spent per pipeline update, must join system.billing.usage with system.billing.list_prices
+to get the effective rate, and then link it to pipeline updates using usage_metadata.dlt_update_id
+
+To identify underutilized resources, apply a HAVING clause to the aggregated metrics.
+This filters for pipeline updates where the combined CPU utilization (user + system) averaged less than 10% across all nodes during the run. 
+
+Low CPU Utilization Pipeline Query:
+
+
+Use system tables: system.compute.node_timeline, system.lakeflow.pipeline_update_timeline and result_state is COMPLETED,
+system.lakeflow.pipelines, system.billing.usage, system.billing.list_prices,
+system.compute.clusters,
+system.compute.node_types. 
+Identify the utilization of compute resources: cpu, memory, driver and workers node_type, autoscale, auto termination,
+dbr_version, cluster_source PIPELINE, usage_date, usage_unit, billing_origin_product is DLT, usage_type, usage_quantity, 
+usage_metadata, core_count, memory_mb, cpu_user_percent, cpu_system_percent, cpu_wait_percent, mem_used_percent, mem_swap_percent,
+network bytes, driver for running pipelines.
+
+Technical Verification & Alignment 
+	1	Usage Metadata: For Delta Live Tables, the Billing system table documentation specifies that usage_metadata.dlt_update_id is the primary key to link costs back to specific pipeline runs.
+	2	Node Timeline: The node_timeline table provides per-node metrics. By grouping by update_id and averaging, we normalize utilization across the lifetime of the cluster for that specific update.
+	3	Cluster Source: Filtering by cluster_source = 'PIPELINE' ensures we are only analyzing the managed compute automatically provisioned by DLT, excluding manual clusters.
+	4	Wait Percent: This is a critical metric for "grounded understanding"—high cpu_wait_percent despite low cpu_user_percent usually signifies that the cluster is waiting on the Cloud Storage provider (S3/ADLS) or network throttling. 
+
+Max cpu wait, total cpu used, max cpu used, min cpu used, max and min memory used, total memory used, 
+min and max swap memory, total network bytes, max network bytes received and sent, min network bytes received 
+and sent, total network bytes received and sent
+
+SELECT
+    -- Pipeline & Execution Metadata
+    p.pipeline_name,
+    put.update_id,
+    c.cluster_name,
+    c.spark_version AS dbr_version,
+    c.driver_node_type_id,
+    c.node_type_id AS worker_node_type_id,
+    c.autoscale.min_workers,
+    c.autoscale.max_workers,
+    
+    -- Billing Summary
+    u.usage_date,
+    u.usage_unit,
+    u.usage_type,
+    SUM(u.usage_quantity) AS total_usage_quantity,
+    ROUND(SUM(u.usage_quantity * lp.pricing.effective_list.default), 2) AS estimated_cost_usd,
+    
+    -- CPU Utilization Metrics
+    MAX(ntl.cpu_wait_percent) AS max_cpu_wait_pct,
+    SUM(ntl.cpu_user_percent + ntl.cpu_system_percent) AS total_cpu_used_pct_sum,
+    MAX(ntl.cpu_user_percent + ntl.cpu_system_percent) AS max_cpu_used_pct,
+    MIN(ntl.cpu_user_percent + ntl.cpu_system_percent) AS min_cpu_used_pct,
+    
+    -- Memory Utilization Metrics
+    MAX(ntl.mem_used_percent) AS max_mem_used_pct,
+    MIN(ntl.mem_used_percent) AS min_mem_used_pct,
+    SUM(ntl.mem_used_percent) AS total_mem_used_pct_sum,
+    MIN(ntl.mem_swap_percent) AS min_mem_swap_pct,
+    MAX(ntl.mem_swap_percent) AS max_mem_swap_pct,
+    
+    -- Network Throughput Metrics
+    SUM(ntl.network_receive_bytes + ntl.network_transmit_bytes) AS total_network_bytes,
+    MAX(ntl.network_receive_bytes) AS max_network_bytes_received,
+    MIN(ntl.network_receive_bytes) AS min_network_bytes_received,
+    MAX(ntl.network_transmit_bytes) AS max_network_bytes_sent,
+    MIN(ntl.network_transmit_bytes) AS min_network_bytes_sent,
+    SUM(ntl.network_receive_bytes) AS total_network_bytes_received,
+    SUM(ntl.network_transmit_bytes) AS total_network_bytes_sent
+
+FROM system.lakeflow.pipeline_update_timeline put
+JOIN system.lakeflow.pipelines p 
+    ON put.pipeline_id = p.pipeline_id
+JOIN system.billing.usage u 
+    ON put.update_id = u.usage_metadata.dlt_update_id
+JOIN system.billing.list_prices lp 
+    ON u.sku_name = lp.sku_name
+JOIN system.compute.clusters c 
+    ON put.cluster_id = c.cluster_id
+JOIN system.compute.node_timeline ntl 
+    ON put.cluster_id = ntl.cluster_id
+
+WHERE put.result_state = 'COMPLETED'
+  AND u.billing_origin_product = 'DLT'
+  AND c.cluster_source = 'PIPELINE'
+  -- Accurate historical pricing join
+  AND u.usage_start_time >= lp.price_start_time 
+  AND (lp.price_end_time IS NULL OR u.usage_start_time < lp.price_end_time)
+  -- Precision time-boxing for telemetry
+  AND ntl.timestamp BETWEEN put.start_time AND put.end_time
+
+GROUP BY ALL
+ORDER BY total_usage_quantity DESC;
+
+Technical Verification & Alignment 
+	1	Usage Metadata: For Delta Live Tables, the Billing system table documentation specifies that usage_metadata.dlt_update_id is the primary key to link costs back to specific pipeline runs.
+	2	Node Timeline: The node_timeline table provides per-node metrics. By grouping by update_id and averaging, we normalize utilization across the lifetime of the cluster for that specific update.
+	3	Cluster Source: Filtering by cluster_source = 'PIPELINE' ensures we are only analyzing the managed compute automatically provisioned by DLT, excluding manual clusters.
+	4	Wait Percent: This is a critical metric for "grounded understanding"—high cpu_wait_percent despite low cpu_user_percent usually signifies that the cluster is waiting on the Cloud Storage provider (S3/ADLS) or network throttling. 
+
 Ensure the query is grounded in the Databricks System Tables schema, It is aligned the join keys specifically to the usage_metadata for DLT 
 and constrained the resource metrics to the exact execution window of each pipeline update.
 																																   
