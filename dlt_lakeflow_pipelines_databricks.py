@@ -1,4 +1,71 @@
-DLT Under-Utilization & Over-Provisioning Audit
+To separate driver and worker resource consumption while calculating precise hardware-level metrics (Actual CPU Cores and Memory MB), you must join node_timeline with node_types. The following query aggregates metrics per pipeline update, split by node role:
+
+DLT Pipeline: Split Driver/Worker Resource Profile
+
+WITH node_metrics AS (
+  SELECT
+    ntl.cluster_id,
+    ntl.instance_id,
+    ntl.driver,
+    ntl.timestamp,
+    -- Configuration Metrics
+    nt.core_count,
+    nt.memory_mb,
+    -- Derived Hardware Metrics
+    (ntl.cpu_user_percent + ntl.cpu_system_percent) / 100 * nt.core_count AS actual_cpu_cores_used,
+    (ntl.mem_used_percent / 100) * nt.memory_mb AS actual_mem_mb_used,
+    -- Original Percentages/Network
+    ntl.cpu_user_percent,
+    ntl.cpu_system_percent,
+    ntl.cpu_wait_percent,
+    ntl.mem_used_percent,
+    ntl.mem_swap_percent,
+    ntl.network_transmit_bytes AS network_sent_bytes,
+    ntl.network_receive_bytes AS network_received_bytes
+  FROM system.compute.node_timeline ntl
+  JOIN system.compute.clusters c ON ntl.cluster_id = c.cluster_id
+  JOIN system.compute.node_types nt ON 
+    (ntl.driver = true AND c.driver_node_type_id = nt.node_type_id) OR 
+    (ntl.driver = false AND c.node_type_id = nt.node_type_id)
+)
+SELECT
+    p.name AS pipeline_name,
+    put.update_id,
+    nm.driver AS is_driver,
+    -- CPU Aggregates
+    SUM(nm.actual_cpu_cores_used) AS total_cpu_cores_used_sum,
+    AVG(nm.actual_cpu_cores_used) AS avg_actual_cpu_cores,
+    MAX(nm.cpu_user_percent) AS max_cpu_user_pct,
+    MIN(nm.cpu_user_percent) AS min_cpu_user_pct,
+    AVG(nm.cpu_system_percent) AS avg_cpu_system_pct,
+    MAX(nm.cpu_wait_percent) AS max_cpu_wait_pct,
+    -- Memory Aggregates
+    AVG(nm.actual_mem_mb_used) AS avg_mem_mb_used,
+    MAX(nm.actual_mem_mb_used) AS max_mem_mb_used,
+    MIN(nm.mem_used_percent) AS min_mem_used_pct,
+    MAX(nm.mem_used_percent) AS max_mem_used_pct,
+    MAX(nm.mem_swap_percent) AS max_mem_swap_pct,
+    -- Network Aggregates
+    SUM(nm.network_sent_bytes) AS total_network_sent_bytes,
+    SUM(nm.network_received_bytes) AS total_network_received_bytes,
+    MAX(nm.network_received_bytes) AS max_network_received_bytes
+FROM system.lakeflow.pipeline_update_timeline put
+JOIN system.lakeflow.pipelines p ON put.pipeline_id = p.pipeline_id
+JOIN node_metrics nm ON put.cluster_id = nm.cluster_id
+WHERE put.result_state = 'COMPLETED'
+  AND nm.timestamp BETWEEN put.start_time AND put.end_time
+GROUP BY ALL
+ORDER BY put.update_id, nm.driver DESC;
+
+
+Add a check to see if the compute consumptions is consistently under utilitization usage, which is a common cause 
+for over provisional cost.
+
+To identify over-provisioning, need to look for low peak utilization. If a cluster's maximum CPU or Memory usage 
+never crosses a certain threshold (e.g., 20%), it is a candidate for a smaller node type or a lower worker count.
+
+The following query adds a RESOURCE_EFFICIENCY_CHECK column that flags "Underutilized" drivers or workers based 
+on their resource peaks during the pipeline run.DLT Under-Utilization & Over-Provisioning Audit.
 
 WITH node_metrics AS (
   SELECT
