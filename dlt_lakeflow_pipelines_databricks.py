@@ -149,12 +149,18 @@ SUM(mem_swap_percent) NOT NULL AS total_mem_swap_pct -- total percentage of memo
 MAX(mem_swap_percent) NOT NULL AS max_mem_swap_pct -- maximum percentage of memory usage attributed to memory swap.
 MIN(mem_swap_percent) NOT NULL AS min_mem_swap_pct -- minimum percentage of memory usage attributed to memory swap.
 
+SUM(network_sent_bytes) NOT NULL AS total_network_sent_bytes -- total number of the bytes sent out in network traffic.
+SUM(network_received_bytes) NOT NULL AS total_network_recv_bytes -- total number of the received bytes from network traffic.
+SUM(network_sent_bytes + network_received_bytes) NOT NULL AS total_network_bytes -- total number of the transimmited bytes in network traffic.
 
-MAX(network_sent_bytes + network_received_bytes) AS max_network_bytes?
-MAX(network_sent_bytes) AS max_network_sent_bytes?
-MAX(network_received_bytes) AS max_network_received_bytes?
+MAX(network_sent_bytes) NOT NULL AS max_network_sent_bytes -- maximum number of the bytes sent out in network traffic.
+MAX(network_received_bytes) NOT NULL AS max_network_recv_bytes -- maximum number of the received bytes from network traffic.
+MAX(network_sent_bytes + network_received_bytes) AS max_network_bytes -- maximum number of the transmitted bytes in network traffic.
 
-																								  
+MIN(network_sent_bytes) NOT NULL AS min_network_sent_bytes -- minimum number of the bytes sent out in network traffic.
+MAX(network_received_bytes) NOT NULL AS min_network_recv_bytes -- minimum number of the received bytes from network traffic.
+MAX(network_sent_bytes + network_received_bytes) AS min_network_bytes -- minimum number of the transmitted bytes in network traffic.
+
 AVG(cpu_wait_percent) AS avg_cpu_wait_pct -- average percentage of time the compute cpu time spent waiting for I/O
 
 
