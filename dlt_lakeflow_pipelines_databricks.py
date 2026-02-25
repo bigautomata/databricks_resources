@@ -131,22 +131,30 @@ driver (NOT NULL) -- Either the instance is a driver or worker node.
 SUM(cpu_user_percent) NOT NULL AS total_cpu_user_pct -- total percentage of time the CPU spent for application running (userland).
 SUM(cpu_system_percent) NOT NULL AS total_cpu_system_pct -- total percentage of time the CPU spent for system running (kernel).
 SUM(cpu_wait_percent) NOT NULL AS total_cpu_system_pct -- total percentage of time the CPU spent waiting for I/O.
-SUM(cpu_user_percent + cpu_system_percent) AS total_cpu_used_pct -- total percentage of time the compute cpu used/spent for the userland/application + kernel/system
-									
-MAX(cpu_user_percent) AS max_cpu_user_pct? -- max percentage of time the CPU spent for userland (application).
-MAX(cpu_system_percent) AS max_cpu_system_pct -- max percentage of time the CPU spent for the kernel (non-application/user).
-MAX(cpu_wait_percent) AS max_cpu_wait_pct -- max percentage of time the CPU spent waiting for I/O.
-MAX(cpu_user_percent + cpu_system_percent) AS max_cpu_used_pct -- max total percentage of time the compute cpu used/spent for the userland/application + kernel/system.																					 
+SUM(cpu_user_percent + cpu_system_percent) AS total_cpu_used_pct -- total percentage of time the compute cpu used/spent for the userland/application + kernel/system									
+MAX(cpu_user_percent) NOT NULL AS max_cpu_user_pct -- maximum percentage of time the CPU spent for userland (application).
+MAX(cpu_system_percent) NOT NULL AS max_cpu_system_pct -- maximum percentage of time the CPU spent for the kernel (non-application/user).
+MAX(cpu_wait_percent) NOT NULL AS max_cpu_wait_pct -- maximum percentage of time the CPU spent waiting for I/O.
+MAX(cpu_user_percent + cpu_system_percent) NOT NULL AS max_cpu_used_pct -- maximum total percentage of time the compute cpu used/spent for the userland/application + kernel/system.																					 
+MIN(cpu_user_percent) NOT NULL AS min_cpu_user_pct -- minimum percentage of time the CPU spent for userland (application).
+MIN(cpu_system_percent) AS min_cpu_system_pct -- minimum percentage of time the CPU spent for the kernel (non-application/user).
+MIN(cpu_wait_percent) AS min_cpu_wait_pct -- minimum percentage of time the CPU spent waiting for I/O.
+MIN(cpu_user_percent + cpu_system_percent) NOT NULL AS min_cpu_used_pct -- mimimum total percentage of time the compute cpu used/spent for the userland/application + kernel/system.																					 
 
-MAX(mem_used_percent) AS max_mem_used_pct -- max percentage of the compute's memory used during the time period (including memory used by background processes running on the compute)
-MAX(mem_swap_percent) AS max_mem_swap_pct? -- max percentage of memory usage attributed to memory swap
+SUM(mem_used_percent) NOT NULL AS total_mem_used_pct -- total percentage of the compute's memory used during the time period (including memory used by background processes running on the compute).																					 
+MAX(mem_used_percent) NOT NULL AS max_mem_used_pct -- maximum percentage of the compute's memory used during the time period (including memory used by background processes running on the compute)
+MIN(mem_used_percent) NOT NULL AS min_mem_used_pct -- minimum percentage of the compute's memory used during the time period (including memory used by background processes running on the compute)
+
+SUM(mem_swap_percent) NOT NULL AS total_mem_swap_pct -- total percentage of memory usage attributed to memory swap.
+MAX(mem_swap_percent) NOT NULL AS max_mem_swap_pct -- maximum percentage of memory usage attributed to memory swap.
+MIN(mem_swap_percent) NOT NULL AS min_mem_swap_pct -- minimum percentage of memory usage attributed to memory swap.
+
 
 MAX(network_sent_bytes + network_received_bytes) AS max_network_bytes?
 MAX(network_sent_bytes) AS max_network_sent_bytes?
 MAX(network_received_bytes) AS max_network_received_bytes?
 
-MIX
-
+																								  
 AVG(cpu_wait_percent) AS avg_cpu_wait_pct -- average percentage of time the compute cpu time spent waiting for I/O
 
 
