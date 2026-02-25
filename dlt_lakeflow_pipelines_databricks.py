@@ -60,7 +60,7 @@ GROUP BY ALL
 ORDER BY max_total_cpu_pct ASC;
 
 
-The following metadata details (values) are missing which are required for pipelines compute specific (per pipeline) in Databricks:
+The following metadata details (values) are missing, they are required for specific Lakeflow Spark Declarative Pipelines compute (per pipeline) in Databricks:
 Compute billing usage and list prices metadata
 workspace_id (NOT NULL) -- ID of the workspace this usage associated with.
 record_type (NOT NULL) -- The record is original, a retraction, or a restatement. See https://docs.databricks.com/aws/en/admin/system-tables/billing#record-type
@@ -93,6 +93,7 @@ pricing.effective_list.default (NOT NULL) AS effective_price -- The effective li
 
 
 Splitting driver and worker computes:
+
 Compute clusters metadata
 cluster_id (NOT NULL) -- ID of the cluster for which pipeline record is associated.
 cluster_name -- Name for the cluster.
@@ -118,14 +119,24 @@ node_type (NOT NULL) -- Unique identifier for node type i.e., i3.xlarge
 core_count (NOT NULL) -- Number of vCPUs for the instance i.e., 48.0
 memory_mb (NOT NULL) -- Total memory for the instance i.e., 393216
 
-Compute node-level resources utilization metadata
-instance_id AS compute_node_instance_id? -- ID for the specific instance
-cluster_id AS compute_node_cluster_id? -- ID of the compute resource
+Compute node-level resources utilization metadata (node timeline)
+-- NOTE: Each record contains data for a given minute of time per instance.
+workspace_id (NOT NULL) -- ID of the workspace where compute resource is running.
+cluster_id (NOT NULL) AS compute_cluster_id -- ID of the compute resource.
+instance_id (NOT NULL) AS compute_instance_id -- ID for the specific instance.
+start_time (NOT NULL) AS compute_start_time.
+end_time (NOT NULL) AS compute_end_time.
+driver (NOT NULL) -- Either the instance is a driver or worker node.
 
-MAX(cpu_user_percent + cpu_system_percent) AS max_cpu_used_pct -- max total percentage of time the compute cpu used/spent in the userland/application + kernel/system
-MAX(cpu_system_percent) AS max_cpu_user_pct? -- max percentage of time the CPU spent in userland (application).
-MAX(cpu_system_percent) AS max_cpu_system_pct? -- max percentage of time the CPU spent in the kernel (non-application/user)
-MAX(cpu_wait_percent) AS max_cpu_wait_pct? -- max percentage of time the CPU spent waiting for I/O
+SUM(cpu_user_percent) NOT NULL AS total_cpu_user_pct -- total percentage of time the CPU spent for application running (userland).
+SUM(cpu_system_percent) NOT NULL AS total_cpu_system_pct -- total percentage of time the CPU spent for system running (kernel).
+SUM(cpu_wait_percent) NOT NULL AS total_cpu_system_pct -- total percentage of time the CPU spent waiting for I/O.
+SUM(cpu_user_percent + cpu_system_percent) AS total_cpu_used_pct -- total percentage of time the compute cpu used/spent for the userland/application + kernel/system
+									
+MAX(cpu_user_percent) AS max_cpu_user_pct? -- max percentage of time the CPU spent for userland (application).
+MAX(cpu_system_percent) AS max_cpu_system_pct -- max percentage of time the CPU spent for the kernel (non-application/user).
+MAX(cpu_wait_percent) AS max_cpu_wait_pct -- max percentage of time the CPU spent waiting for I/O.
+MAX(cpu_user_percent + cpu_system_percent) AS max_cpu_used_pct -- max total percentage of time the compute cpu used/spent for the userland/application + kernel/system.																					 
 
 MAX(mem_used_percent) AS max_mem_used_pct -- max percentage of the compute's memory used during the time period (including memory used by background processes running on the compute)
 MAX(mem_swap_percent) AS max_mem_swap_pct? -- max percentage of memory usage attributed to memory swap
