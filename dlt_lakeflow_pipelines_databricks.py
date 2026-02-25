@@ -1,4 +1,114 @@
-To separate driver and worker resource consumption while calculating precise hardware-level metrics (Actual CPU Cores and Memory MB), you must join node_timeline with node_types. The following query aggregates metrics per pipeline update, split by node role:
+Ensure the query is grounded in the Databricks System Tables schema, It is aligned the join keys specifically to the usage_metadata for DLT 
+and constrained the resource metrics to the exact execution window of each pipeline update.
+																																   
+Add a calculated column that identifies "Zombies"—pipelines that cost more than $5 per run but use less than 5% of their CPU?
+
+-- Compute Utilization Metrics (Averaged over the run duration)
+ROUND(AVG(ntl.cpu_user_percent), 2) AS avg_cpu_user_pct,
+ROUND(AVG(ntl.cpu_system_percent), 2) AS avg_cpu_system_pct,
+ROUND(AVG(ntl.cpu_wait_percent), 2) AS avg_cpu_wait_pct,
+ROUND(AVG(ntl.mem_used_percent), 2) AS avg_mem_used_pct,
+ROUND(AVG(ntl.mem_swap_percent), 2) AS avg_mem_swap_pct,
+    
+-- Network Throughput
+SUM(ntl.network_receive_bytes + ntl.network_transmit_bytes) AS total_network_bytes
+
+To provide a comprehensive view of DLT pipeline efficiency, this query combines cluster configuration, hardware specifications, operational telemetry,
+and financial costs. It focuses on completed updates where the origin is DLT and the compute is specifically pipeline-sourced.
+
+Analysis of Low Utilization 
+    •    Over-Provisioning: If a pipeline consistently appears in this list with high cost_usd, it is likely using a node type that is too large (e.g., Memory Optimized (https://docs.databricks.com/aws/en/admin/system-tables/compute) when it only needs general purpose).
+    •    Idle Clusters: Check cpu_wait_percent. If this is high while total CPU is low, the cluster is spending most of its time waiting for I/O (reading from slow source systems) rather than processing data.
+    •    Autoscale Limits: For pipelines in this list, consider reducing the min_workers to 1 to ensure the cluster scales down during low-intensity tasks.
+
+Critical Joining Logic 
+    •    Update ID Mapping: Costs for Lakeflow Pipelines (https://docs.databricks.com/aws/en/admin/usage/system-tables) are tracked via usage_metadata.dlt_update_id
+Time-Bound Metrics: The join on node_timeline is constrained by the pipeline's start_time and end_time to ensure you only see utilization while that specific update was active.
+Pricing Accuracy: Joining with system.billing.list_prices ensures you are using the correct rate for your specific SKU and timeframe.
+
+Include billing costs from system.billing.usage so you can see the dollar amount spent per pipeline update?
+
+Insights to Look For 
+	•	Low CPU/Mem Usage: If avg_cpu_user and avg_mem_used are consistently below 20-30%, consider down-sizing the node_type_id or reducing the max_workers in the autoscale settings.
+	•	High Swap Usage: If mem_swap_percent is high, your nodes are running out of RAM, leading to significant performance degradation (spilling to disk).
+	•	Autoscale Efficiency: Compare the min_workers and max_workers against the actual number of nodes active in the node_timeline to see if the cluster is scaling up unnecessarily. 
+
+Analyze the utilization and configuration of compute resources dedicated to Delta Live Tables (LakeFlow) pipelines, need to join 
+the operational metrics from node_timeline with the metadata from pipelines and clusters. Make sure the query provides a comprehensive
+view of resource consumption (CPU/Memory) alongside cluster configurations (Autoscale/DBR/Node Types) for completed pipeline updates.
+
+ETL Pipeline Compute Resource Consumption Query
+SELECT
+    -- Pipeline Identification & Metadata
+    p.pipeline_id,
+    p.pipeline_type,
+    p.name,
+    p.settings,
+    p.configuration,
+    put.workspace_id,
+    put.update_id,
+    put.trigger_type,
+    put.result_state,
+    put.start_time AS period_start_time,
+    put.end_time AS period_end_time,
+    
+    -- Cluster Configuration (from system.compute.clusters)
+    c.cluster_id,
+    c.cluster_source,
+    c.spark_version AS dbr_version,
+    c.driver_node_type_id AS driver_node_type,
+    c.node_type_id AS worker_node_type,
+    c.worker_count,
+    c.autoscale.min_workers AS min_autoscale_workers,
+    c.autoscale.max_workers AS max_autoscale_workers,
+    c.autotermination_minutes,
+    
+    -- Node Hardware Specs (from system.compute.node_types)
+    nt.node_type,
+    nt.core_count,
+    nt.memory_mb,
+    
+    -- Telemetry & Utilization (from system.compute.node_timeline)
+    ntl.driver,
+    ntl.start_time AS metric_start_time,
+    ntl.end_time AS metric_end_time,
+    ntl.cpu_user_percent,
+    ntl.cpu_system_percent,
+    ntl.cpu_wait_percent,
+    ntl.mem_used_percent,
+    ntl.mem_swap_percent,
+    ntl.network_transmit_bytes AS network_sent_bytes,
+    ntl.network_receive_bytes AS network_received_bytes
+
+FROM system.lakeflow.pipeline_update_timeline put
+JOIN system.lakeflow.pipelines p 
+    ON put.pipeline_id = p.pipeline_id
+JOIN system.compute.clusters c 
+    ON put.cluster_id = c.cluster_id
+JOIN system.compute.node_types nt 
+    ON c.node_type_id = nt.node_type
+JOIN system.compute.node_timeline ntl 
+    ON put.cluster_id = ntl.cluster_id
+
+WHERE put.result_state = 'COMPLETED'
+  AND p.pipeline_type = 'ETL_PIPELINE'
+  AND c.cluster_source = 'PIPELINE'
+  -- Joins metrics recorded only during the specific pipeline update window
+  AND ntl.timestamp BETWEEN put.start_time AND put.end_time
+
+ORDER BY put.start_time DESC, ntl.timestamp ASC;
+
+Critical Implementation Details 
+    •    Pipeline Scoping: The system.lakeflow.pipelines table identifies specific configurations active during the update.
+    •    Time-Boxing: Utilization in node_timeline is captured at minute granularity. The BETWEEN clause ensures not viewing "noise" from cluster startup/shutdown outside of the actual pipeline processing window.
+    •    Memory Analysis: mem_used_percent is node-specific. To calculate the actual MB used, you can multiply this percentage by the memory_mb from the Node Types table (https://docs.databricks.com/aws/en/admin/system-tables/compute).
+    •    Cluster Source: Filtering for PIPELINE ensures looking at managed compute specifically provisioned for Lakeflow Spark Declarative Pipelines. 
+
+Add an aggregation to this query to calculate the "Peak Memory Usage" across the entire cluster for each individual update?
+
+
+To separate driver and worker resource consumption while calculating precise hardware-level metrics (Actual CPU Cores and Memory MB),
+must join node_timeline with node_types. The following query aggregates metrics per pipeline update, split by node role:
 
 DLT Pipeline: Split Driver/Worker Resource Profile
 
