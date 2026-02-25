@@ -127,15 +127,18 @@ instance_id (NOT NULL) AS compute_instance_id -- ID for the specific instance.
 start_time (NOT NULL) AS compute_start_time.
 end_time (NOT NULL) AS compute_end_time.
 driver (NOT NULL) -- Either the instance is a driver or worker node.
+node_type (NOT NULL) -- Name of the node type which matches the instance type name from the cloud provider.
 
 SUM(cpu_user_percent) NOT NULL AS total_cpu_user_pct -- total percentage of time the CPU spent for application running (userland).
 SUM(cpu_system_percent) NOT NULL AS total_cpu_system_pct -- total percentage of time the CPU spent for system running (kernel).
-SUM(cpu_wait_percent) NOT NULL AS total_cpu_system_pct -- total percentage of time the CPU spent waiting for I/O.
+SUM(cpu_wait_percent) NOT NULL AS total_cpu_wait_pct -- total percentage of time the CPU spent waiting for I/O.
 SUM(cpu_user_percent + cpu_system_percent) AS total_cpu_used_pct -- total percentage of time the compute cpu used/spent for the userland/application + kernel/system									
+
 MAX(cpu_user_percent) NOT NULL AS max_cpu_user_pct -- maximum percentage of time the CPU spent for userland (application).
 MAX(cpu_system_percent) NOT NULL AS max_cpu_system_pct -- maximum percentage of time the CPU spent for the kernel (non-application/user).
 MAX(cpu_wait_percent) NOT NULL AS max_cpu_wait_pct -- maximum percentage of time the CPU spent waiting for I/O.
 MAX(cpu_user_percent + cpu_system_percent) NOT NULL AS max_cpu_used_pct -- maximum total percentage of time the compute cpu used/spent for the userland/application + kernel/system.																					 
+
 MIN(cpu_user_percent) NOT NULL AS min_cpu_user_pct -- minimum percentage of time the CPU spent for userland (application).
 MIN(cpu_system_percent) AS min_cpu_system_pct -- minimum percentage of time the CPU spent for the kernel (non-application/user).
 MIN(cpu_wait_percent) AS min_cpu_wait_pct -- minimum percentage of time the CPU spent waiting for I/O.
@@ -161,7 +164,15 @@ MIN(network_sent_bytes) NOT NULL AS min_network_sent_bytes -- minimum number of 
 MAX(network_received_bytes) NOT NULL AS min_network_recv_bytes -- minimum number of the received bytes from network traffic.
 MAX(network_sent_bytes + network_received_bytes) AS min_network_bytes -- minimum number of the transmitted bytes in network traffic.
 
+AVG(cpu_user_percent) NOT NULL AS avg_cpu_user_pct -- Average percentage of time the CPU spent for application running (userland).
+AVG(cpu_system_percent) NOT NULL AS avg_cpu_system_pct -- Average percentage of time the CPU spent for system running (kernel).
 AVG(cpu_wait_percent) AS avg_cpu_wait_pct -- average percentage of time the compute cpu time spent waiting for I/O
+
+AVG(mem_used_percent) NOT NULL AS avg_mem_used_pct -- Average percentage of the compute's memory used during the time period (including memory used by background processes running on the compute).																					 
+AVG(mem_swap_percent) NOT NULL AS avg_mem_swap_pct -- Average percentage of memory usage attributed to memory swap.
+
+AVG(network_sent_bytes) NOT NULL AS avg_network_sent_bytes -- Average number of the bytes sent out in network traffic.
+AVG(network_received_bytes) NOT NULL AS avg_network_recv_bytes -- Average number of the received bytes from network traffic.
 
 
 Pipeline metadata
