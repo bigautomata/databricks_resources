@@ -98,6 +98,329 @@ To analyze compute utilization (CPU, memory, network), node types (hardware info
 This approach ensures a comprehensive, grounded analysis of compute utilization, hardware, cluster configuration, and cost for Lakeflow Declarative Pipelines for "yesterday" with only completed runs[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/")[[2]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/")[[4]](https://docs.databricks.com/aws/en/admin/system-tables/jobs-cost/ "/docs.databricks.com/aws/en/admin/system-tables/jobs-cost/")[[3]](https://docs.databricks.com/aws/en/admin/system-tables/index/ "/docs.databricks.com/aws/en/admin/system-tables/index/").
 
 *Always review the accuracy of responses.*
+
+To analyze compute utilization (CPU, memory, network), node types (hardware information), cluster compute configurations, and actual cost for running DLT/Lakeflow Spark Declarative Pipelines for "yesterday" (system date minus 1 day) in Databricks, and only for completed pipeline runs, you can use the following SQL query. This query assumes you have access to the relevant system tables and that the necessary columns exist as described.
+
+```sql
+SELECT
+  p.workspace_id,
+  p.pipeline_id,
+  p.update_id,
+  p.period_start_time,
+  p.period_end_time,
+  c.cluster_id,
+  c.cluster_name,
+  c.spark_version,
+  c.node_type_id,
+  nt.instance_type,
+  nt.num_cores,
+  nt.memory_gb,
+  AVG(n.cpu_user_percent + n.cpu_system_percent) AS avg_cpu_utilization,
+  MAX(n.cpu_user_percent + n.cpu_system_percent) AS peak_cpu_utilization,
+  AVG(n.mem_used_percent) AS avg_memory_utilization,
+  MAX(n.mem_used_percent) AS peak_memory_utilization,
+  AVG(n.network_received_bytes) / (1024 * 1024) AS avg_network_mb_received,
+  AVG(n.network_sent_bytes) / (1024 * 1024) AS avg_network_mb_sent,
+  SUM(b.usage_quantity) AS total_usage_quantity,
+  SUM(b.usage_amount) AS total_cost
+FROM system.lakeflow.pipeline_update_timeline p
+JOIN system.compute.clusters c
+  ON p.cluster_id = c.cluster_id
+JOIN system.compute.node_timeline n
+  ON c.cluster_id = n.cluster_id
+     AND DATE(n.period_start_time) = DATE(p.period_start_time)
+JOIN system.compute.node_types nt
+  ON c.node_type_id = nt.node_type_id
+LEFT JOIN system.billing.usage b
+  ON c.cluster_id = b.cluster_id
+     AND DATE(b.usage_start_time) = DATE(p.period_start_time)
+WHERE p.result_state = 'COMPLETED'
+  AND DATE(p.period_start_time) = DATE_ADD(CURRENT_DATE(), -1)
+GROUP BY
+  p.workspace_id,
+  p.pipeline_id,
+  p.update_id,
+  p.period_start_time,
+  p.period_end_time,
+  c.cluster_id,
+  c.cluster_name,
+  c.spark_version,
+  c.node_type_id,
+  nt.instance_type,
+  nt.num_cores,
+  nt.memory_gb
+ORDER BY
+  total_cost DESC
+```
+This query:
+- Filters for completed pipeline updates that started "yesterday"
+- Joins with clusters for configuration details
+- Joins with node timeline for compute utilization metrics
+- Joins with node types for hardware specs
+- Joins with billing usage for cost
+- Aggregates utilization and cost metrics per pipeline update and cluster
+
+**Note:**  
+- Adjust column names if your schema differs.
+- Ensure you have the necessary permissions to access these system tables.
+- The actual column names for hardware specs and billing may vary; check your system tables for exact names.
+
+Let me know if you need a more granular breakdown (e.g., per node or per task) or want to filter for specific pipeline types!
+
+*Always review the accuracy of responses.*
+
+To analyze per-pipeline-run compute utilization, node types, cluster configurations, and actual cost for **Lakeflow Declarative Pipelines** (DLT) for "yesterday" (system date minus 1 day), and to ensure all required columns are included, you should join the following system tables:
+
+- `system.lakeflow.pipeline_update_timeline`
+- `system.lakeflow.pipelines`
+- `system.compute.clusters`
+- `system.compute.node_types`
+- `system.compute.node_timeline`
+- `system.billing.usage`
+- `system.billing.list_prices`
+
+Below is a comprehensive SQL query that demonstrates how to join these tables, filter for completed pipeline runs for "yesterday", and select the required columns. Adjust the query as needed for your environment and data volume.
+
+```sql
+SELECT
+  -- Pipeline run info
+  pu.workspace_id,
+  pu.pipeline_id,
+  pu.update_id,
+  pu.update_type,
+  pu.trigger_type,
+  pu.trigger_details,
+  pu.result_state,
+  pu.compute,
+  pu.period_start_time,
+  pu.period_end_time,
+
+  -- Pipeline metadata
+  p.name AS pipeline_name,
+  p.pipeline_type,
+  p.settings AS pipeline_settings,
+  p.configuration AS pipeline_configuration,
+
+  -- Cluster configuration
+  c.dbr_version,
+  c.aws_attributes,
+  c.cluster_source,
+  c.auto_termination_minutes,
+  c.max_autoscale_workers,
+  c.min_autoscale_workers,
+  c.worker_count,
+  c.worker_node_type,
+  c.driver_node_type,
+  c.create_time AS cluster_create_time,
+  c.cluster_name,
+  c.cluster_id,
+  c.workspace_id AS cluster_workspace_id,
+  c.account_id AS cluster_account_id,
+
+  -- Node type hardware info (worker)
+  nt.node_type AS worker_node_type_name,
+  nt.core_count AS worker_core_count,
+  nt.memory_mb AS worker_memory_mb,
+
+  -- Node timeline (utilization)
+  ntl.cluster_id AS node_cluster_id,
+  ntl.instance_id,
+  ntl.start_time AS node_start_time,
+  ntl.end_time AS node_end_time,
+  ntl.driver,
+  ntl.cpu_user_percent,
+  ntl.cpu_system_percent,
+  ntl.cpu_wait_percent,
+  ntl.mem_used_percent,
+  ntl.mem_swap_percent,
+  ntl.network_sent_bytes,
+  ntl.network_received_bytes,
+  ntl.node_type AS node_type_name,
+
+  -- Billing usage
+  bu.account_id AS billing_account_id,
+  bu.workspace_id AS billing_workspace_id,
+  bu.sku_name,
+  bu.usage_start_time,
+  bu.usage_end_time,
+  bu.usage_date,
+  bu.usage_quantity,
+  bu.usage_metadata['cluster_id'] AS usage_cluster_id,
+  bu.usage_metadata['dlt_pipeline_id'] AS usage_pipeline_id,
+  bu.usage_metadata['dlt_update_id'] AS usage_update_id,
+  bu.ingestion_date,
+  bu.billing_origin_product,
+  bu.product_features,
+  bu.usage_type,
+
+  -- List prices
+  lp.price_start_time,
+  lp.price_end_time,
+  lp.account_id AS price_account_id,
+  lp.usage_unit,
+  lp.pricing['default'] AS default_price
+
+FROM system.lakeflow.pipeline_update_timeline pu
+JOIN system.lakeflow.pipelines p
+  ON pu.workspace_id = p.workspace_id
+  AND pu.pipeline_id = p.pipeline_id
+JOIN system.compute.clusters c
+  ON pu.compute = c.cluster_id
+JOIN system.compute.node_timeline ntl
+  ON c.cluster_id = ntl.cluster_id
+  AND DATE(ntl.start_time) = DATE(pu.period_start_time)
+JOIN system.compute.node_types nt
+  ON c.worker_node_type = nt.node_type
+LEFT JOIN system.billing.usage bu
+  ON c.cluster_id = bu.usage_metadata['cluster_id']
+  AND pu.pipeline_id = bu.usage_metadata['dlt_pipeline_id']
+  AND pu.update_id = bu.usage_metadata['dlt_update_id']
+  AND bu.billing_origin_product = 'DLT'
+  AND DATE(bu.usage_date) = DATE(pu.period_start_time)
+LEFT JOIN system.billing.list_prices lp
+  ON bu.account_id = lp.account_id
+  AND bu.usage_type = lp.usage_unit
+  AND bu.usage_start_time BETWEEN lp.price_start_time AND lp.price_end_time
+
+WHERE
+  pu.result_state = 'COMPLETED'
+  AND DATE(pu.period_start_time) = DATE_ADD(CURRENT_DATE(), -1)
+  AND p.pipeline_type = 'ETL_PIPELINE'
+ORDER BY
+  pu.workspace_id, pu.pipeline_id, pu.update_id, ntl.instance_id
+```
+[[1]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/")
+
+**Key points:**
+- This query ensures all required columns from each table are included.
+- It filters for completed pipeline runs for "yesterday" and only for ETL_PIPELINE type pipelines.
+- Joins are made on relevant keys (e.g., cluster_id, pipeline_id, update_id).
+- Billing and pricing are joined to provide cost context per pipeline run.
+- You may need to adjust join conditions or column names if your schema differs.
+
+**Limitations:**
+- The query assumes that the `compute` field in `pipeline_update_timeline` maps to `cluster_id` in `clusters`.
+- If you have multiple node types per cluster (e.g., different worker/driver types), you may need to join `node_types` for both.
+- Some records may be missing if clusters or nodes were deleted before October 23, 2023, or if nodes ran for less than 10 minutes[[1]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/").
+
+Let me know if you need aggregation (e.g., average CPU per pipeline run) or further breakdowns!
+
+
+
+
+
+*Always review the accuracy of responses.*
+
+
+To provide per-pipeline-run aggregations for Lakeflow Spark Declarative Pipelines (DLT) for "yesterday"—including network, actual used vs unused total memory and CPU, max, min, average memory and CPU usages, and cost per pipeline run—you would use the relevant system tables and aggregate the metrics accordingly.
+
+Below is an example SQL query that demonstrates how to join the required tables and compute the requested aggregations. This query assumes the column names and relationships as you specified:
+
+```sql
+SELECT
+  pu.workspace_id,
+  pu.pipeline_id,
+  pu.update_id,
+  pu.period_start_time,
+  pu.period_end_time,
+  p.name AS pipeline_name,
+  c.cluster_id,
+  c.cluster_name,
+  c.dbr_version,
+  c.aws_attributes,
+  c.cluster_source,
+  c.auto_termination_minutes,
+  c.max_autoscale_workers,
+  c.min_autoscale_workers,
+  c.worker_count,
+  c.worker_node_type,
+  c.driver_node_type,
+  c.create_time,
+  c.account_id,
+  nt.node_type,
+  nt.core_count,
+  nt.memory_mb,
+  -- CPU aggregations
+  MIN(ntl.cpu_user_percent + ntl.cpu_system_percent) AS min_cpu_used_percent,
+  MAX(ntl.cpu_user_percent + ntl.cpu_system_percent) AS max_cpu_used_percent,
+  AVG(ntl.cpu_user_percent + ntl.cpu_system_percent) AS avg_cpu_used_percent,
+  100 - MAX(ntl.cpu_user_percent + ntl.cpu_system_percent) AS min_cpu_unused_percent,
+  100 - MIN(ntl.cpu_user_percent + ntl.cpu_system_percent) AS max_cpu_unused_percent,
+  100 - AVG(ntl.cpu_user_percent + ntl.cpu_system_percent) AS avg_cpu_unused_percent,
+  -- Memory aggregations
+  MIN(ntl.mem_used_percent) AS min_mem_used_percent,
+  MAX(ntl.mem_used_percent) AS max_mem_used_percent,
+  AVG(ntl.mem_used_percent) AS avg_mem_used_percent,
+  100 - MAX(ntl.mem_used_percent) AS min_mem_unused_percent,
+  100 - MIN(ntl.mem_used_percent) AS max_mem_unused_percent,
+  100 - AVG(ntl.mem_used_percent) AS avg_mem_unused_percent,
+  -- Network aggregations
+  SUM(ntl.network_sent_bytes) / (1024 * 1024) AS total_network_sent_mb,
+  SUM(ntl.network_received_bytes) / (1024 * 1024) AS total_network_received_mb,
+  -- Cost aggregations
+  SUM(bu.usage_amount) AS total_cost
+FROM system.lakeflow.pipeline_update_timeline pu
+JOIN system.lakeflow.pipelines p
+  ON pu.workspace_id = p.workspace_id
+  AND pu.pipeline_id = p.pipeline_id
+JOIN system.compute.clusters c
+  ON pu.compute = c.cluster_id
+JOIN system.compute.node_timeline ntl
+  ON c.cluster_id = ntl.cluster_id
+  AND DATE(ntl.start_time) = DATE(pu.period_start_time)
+JOIN system.compute.node_types nt
+  ON ntl.node_type = nt.node_type
+LEFT JOIN system.billing.usage bu
+  ON c.cluster_id = bu.usage_metadata['cluster_id']
+  AND pu.pipeline_id = bu.usage_metadata['dlt_pipeline_id']
+  AND pu.update_id = bu.usage_metadata['dlt_update_id']
+  AND bu.billing_origin_product = 'DLT'
+  AND DATE(bu.usage_date) = DATE(pu.period_start_time)
+WHERE
+  pu.result_state = 'COMPLETED'
+  AND DATE(pu.period_start_time) = DATE_ADD(CURRENT_DATE(), -1)
+  AND p.pipeline_type = 'ETL_PIPELINE'
+GROUP BY
+  pu.workspace_id,
+  pu.pipeline_id,
+  pu.update_id,
+  pu.period_start_time,
+  pu.period_end_time,
+  p.name,
+  c.cluster_id,
+  c.cluster_name,
+  c.dbr_version,
+  c.aws_attributes,
+  c.cluster_source,
+  c.auto_termination_minutes,
+  c.max_autoscale_workers,
+  c.min_autoscale_workers,
+  c.worker_count,
+  c.worker_node_type,
+  c.driver_node_type,
+  c.create_time,
+  c.account_id,
+  nt.node_type,
+  nt.core_count,
+  nt.memory_mb
+ORDER BY
+  total_cost DESC
+```
+[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/")[[2]](https://docs.databricks.com/aws/en/compute/cluster-metrics/ "/docs.databricks.com/aws/en/compute/cluster-metrics/")
+
+**Explanation:**
+- **CPU and Memory:** The query calculates min, max, and average used and unused percentages for both CPU and memory.
+- **Network:** Sums the total sent and received bytes, converting to MB.
+- **Cost:** Sums the usage amount from billing for each pipeline run.
+- **Grouping:** All aggregations are per pipeline run (by workspace, pipeline, update, and cluster).
+
+This approach gives you a comprehensive, per-pipeline-run view of resource utilization and cost, supporting observability and optimization for your Lakeflow pipelines[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/")[[2]](https://docs.databricks.com/aws/en/compute/cluster-metrics/ "/docs.databricks.com/aws/en/compute/cluster-metrics/").
+
+
+
+
+
+*Always review the accuracy of responses.*
 -----///////
 Use system tables: system.compute.node_timeline, system.lakeflow.pipeline_update_timeline and result_state is COMPLETED,
 system.lakeflow.pipelines, system.billing.usage,
