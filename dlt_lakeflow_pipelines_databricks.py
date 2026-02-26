@@ -1,3 +1,104 @@
+To analyze compute utilization (CPU, memory, network), node types (hardware information), cluster compute configurations, and actual cost for running **Lakeflow Spark Declarative Pipelines** (formerly DLT) for "yesterday" in Databricks, you need to use a combination of system tables. Here’s a thorough review of the required tables and their purpose:
+
+---
+
+### **Required System Tables**
+
+1. **system.lakeflow.pipeline_update_timeline**
+   - Tracks pipeline update events, including metadata about pipeline runs, their compute resources, and their result state. Use this table to filter for completed pipeline updates and to restrict your analysis to "yesterday"[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/").
+
+2. **system.compute.node_timeline**
+   - Provides minute-by-minute records of compute utilization metrics (CPU, memory, network) for each node in your clusters. This is essential for detailed resource analysis[[2]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/").
+
+3. **system.compute.node_types**
+   - Contains hardware information for each available node type, such as CPU, memory, and other specs. Use this to enrich your utilization metrics with hardware context[[2]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/").
+
+4. **system.compute.clusters**
+   - Records the compute configurations for all clusters, including those used by Lakeflow Declarative Pipelines. This table helps you understand the cluster setup and configuration for each pipeline run[[2]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/")[[3]](https://docs.databricks.com/aws/en/admin/system-tables/index/ "/docs.databricks.com/aws/en/admin/system-tables/index/").
+
+5. **system.billing.usage**
+   - Includes records for all billable usage across your account. Use this table to analyze actual costs associated with the compute resources used by your pipelines[[3]](https://docs.databricks.com/aws/en/admin/system-tables/index/ "/docs.databricks.com/aws/en/admin/system-tables/index/").
+
+---
+
+### **How to Use These Tables**
+
+- **Filter pipeline updates** in `system.lakeflow.pipeline_update_timeline` for:
+  - `result_state = 'COMPLETED'`
+  - `period_start_time` = system date minus 1 day
+
+- **Join with node timeline** (`system.compute.node_timeline`) on workspace, cluster, and time to get utilization metrics for the relevant pipeline runs.
+
+- **Enrich with node_types** (`system.compute.node_types`) to add hardware details to each node.
+
+- **Join with clusters** (`system.compute.clusters`) to get cluster configuration details for each pipeline run.
+
+- **Join with billing usage** (`system.billing.usage`) to get actual cost for the compute resources used.
+
+---
+
+### **Example Workflow**
+
+1. **Identify completed pipeline updates for yesterday:**
+   ```sql
+   SELECT *
+   FROM system.lakeflow.pipeline_update_timeline
+   WHERE result_state = 'COMPLETED'
+     AND DATE(period_start_time) = DATE_ADD(CURRENT_DATE(), -1)
+   ```
+2. **Join with node timeline for utilization metrics:**
+   ```sql
+   SELECT p.workspace_id, p.pipeline_id, n.cluster_id, n.node_id,
+          AVG(n.cpu_user_percent + n.cpu_system_percent) AS avg_cpu,
+          AVG(n.mem_used_percent) AS avg_mem,
+          AVG(n.network_received_bytes) AS avg_net_in,
+          AVG(n.network_sent_bytes) AS avg_net_out
+   FROM system.lakeflow.pipeline_update_timeline p
+   JOIN system.compute.node_timeline n
+     ON p.workspace_id = n.workspace_id
+    AND DATE(n.period_start_time) = DATE(p.period_start_time)
+   WHERE p.result_state = 'COMPLETED'
+     AND DATE(p.period_start_time) = DATE_ADD(CURRENT_DATE(), -1)
+   GROUP BY p.workspace_id, p.pipeline_id, n.cluster_id, n.node_id
+   ```
+3. **Enrich with node_types and clusters:**
+   ```sql
+   SELECT nt.*, c.*
+   FROM system.compute.node_types nt
+   JOIN system.compute.clusters c
+     ON nt.node_type_id = c.node_type_id
+   ```
+4. **Join with billing usage for cost:**
+   ```sql
+   SELECT b.*
+   FROM system.billing.usage b
+   WHERE DATE(b.usage_start_time) = DATE_ADD(CURRENT_DATE(), -1)
+   ```
+
+---
+
+### **Summary Table Mapping**
+
+| Table                                 | Purpose                                                      |
+|----------------------------------------|--------------------------------------------------------------|
+| system.lakeflow.pipeline_update_timeline | Pipeline run metadata, filter for completed/yesterday         |
+| system.compute.node_timeline           | CPU, memory, network utilization metrics                     |
+| system.compute.node_types              | Hardware specs for each node type                            |
+| system.compute.clusters                | Cluster configuration for each pipeline run                  |
+| system.billing.usage                   | Actual cost for compute resources used                       |
+
+---
+
+**Requirements:**  
+- You must have the appropriate permissions (USE and SELECT on system schemas) and the system.lakeflow schema must be enabled[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/")[[4]](https://docs.databricks.com/aws/en/admin/system-tables/jobs-cost/ "/docs.databricks.com/aws/en/admin/system-tables/jobs-cost/")[[3]](https://docs.databricks.com/aws/en/admin/system-tables/index/ "/docs.databricks.com/aws/en/admin/system-tables/index/").
+- Your workspace must be enabled for Unity Catalog to access system tables[[3]](https://docs.databricks.com/aws/en/admin/system-tables/index/ "/docs.databricks.com/aws/en/admin/system-tables/index/").
+
+---
+
+This approach ensures a comprehensive, grounded analysis of compute utilization, hardware, cluster configuration, and cost for Lakeflow Declarative Pipelines for "yesterday" with only completed runs[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/")[[2]](https://docs.databricks.com/aws/en/admin/system-tables/compute/ "/docs.databricks.com/aws/en/admin/system-tables/compute/")[[4]](https://docs.databricks.com/aws/en/admin/system-tables/jobs-cost/ "/docs.databricks.com/aws/en/admin/system-tables/jobs-cost/")[[3]](https://docs.databricks.com/aws/en/admin/system-tables/index/ "/docs.databricks.com/aws/en/admin/system-tables/index/").
+
+*Always review the accuracy of responses.*
+-----///////
 Use system tables: system.compute.node_timeline, system.lakeflow.pipeline_update_timeline and result_state is COMPLETED,
 system.lakeflow.pipelines, system.billing.usage,
 system.compute.clusters,
