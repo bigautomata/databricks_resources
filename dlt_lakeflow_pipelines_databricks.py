@@ -306,11 +306,7 @@ ORDER BY
 Let me know if you need aggregation (e.g., average CPU per pipeline run) or further breakdowns!
 
 
-
-
-
 *Always review the accuracy of responses.*
-
 
 To provide per-pipeline-run aggregations for Lakeflow Spark Declarative Pipelines (DLT) for "yesterday"—including network, actual used vs unused total memory and CPU, max, min, average memory and CPU usages, and cost per pipeline run—you would use the relevant system tables and aggregate the metrics accordingly.
 
@@ -415,12 +411,133 @@ ORDER BY
 - **Grouping:** All aggregations are per pipeline run (by workspace, pipeline, update, and cluster).
 
 This approach gives you a comprehensive, per-pipeline-run view of resource utilization and cost, supporting observability and optimization for your Lakeflow pipelines[[1]](https://docs.databricks.com/aws/en/data-engineering/observability-best-practices/ "/docs.databricks.com/aws/en/data-engineering/observability-best-practices/")[[2]](https://docs.databricks.com/aws/en/compute/cluster-metrics/ "/docs.databricks.com/aws/en/compute/cluster-metrics/").
+*Always review the accuracy of responses.*
+
+Your SQL query for aggregating per-pipeline-run compute utilization, node types, cluster configurations, and cost for Lakeflow Spark Declarative Pipelines is well-structured and aligns with Databricks best practices in several key areas:
+
+### Alignment with Databricks Best Practices
+
+**1. Data Modeling and Joins**  
+- The query uses explicit joins between system tables based on well-defined keys (e.g., `pipeline_id`, `update_id`, `cluster_id`), which is recommended for clarity and performance.
+- It aggregates at the correct granularity (per pipeline run), which is important for observability and cost analysis[[1]](https://docs.databricks.com/aws/en/data-engineering/best-practices/ "/docs.databricks.com/aws/en/data-engineering/best-practices/").
+
+**2. Aggregations and Metrics**  
+- The use of `MIN`, `MAX`, `AVG`, and `SUM` for CPU, memory, and network metrics provides a comprehensive view of resource utilization.
+- Calculating both used and unused percentages for CPU and memory helps identify inefficiencies and potential optimization opportunities.
+
+**3. Filtering and Partition Pruning**  
+- The query filters on `DATE(pu.period_start_time) = DATE_ADD(CURRENT_DATE(), -1)` and `pu.result_state = 'COMPLETED'`, which enables partition pruning if the underlying tables are partitioned by date or result state. This is a best practice for query performance[[2]](https://docs.databricks.com/aws/en/cheat-sheet/bi-serving-data-prep/ "/docs.databricks.com/aws/en/cheat-sheet/bi-serving-data-prep/").
+
+**4. Use of Managed and System Tables**  
+- The query leverages Databricks system tables, which are managed and optimized for analytics and observability use cases[[1]](https://docs.databricks.com/aws/en/data-engineering/best-practices/ "/docs.databricks.com/aws/en/data-engineering/best-practices/").
+
+**5. Cost Analysis**  
+- Joining with the billing usage table and aggregating cost per pipeline run is a recommended approach for cost observability and optimization[[1]](https://docs.databricks.com/aws/en/data-engineering/best-practices/ "/docs.databricks.com/aws/en/data-engineering/best-practices/").
+
+**6. Data Preparation and Star Schema**  
+- The query structure resembles a star schema, with the pipeline run as the fact and the other tables as dimensions, which is a best practice for analytical queries[[2]](https://docs.databricks.com/aws/en/cheat-sheet/bi-serving-data-prep/ "/docs.databricks.com/aws/en/cheat-sheet/bi-serving-data-prep/").
+
+### Optimization Recommendations
+
+- **Statistics and Caching:**  
+  Ensure that statistics are up to date on all system tables. If you notice slow performance, consider running `ANALYZE TABLE <table> COMPUTE STATISTICS FOR ALL COLUMNS` on large tables to help the cost-based optimizer make better decisions[[3]](https://docs.databricks.com/aws/en/optimizations/cbo/ "/docs.databricks.com/aws/en/optimizations/cbo/").
+- **Column Selection:**  
+  Only select columns you need for your analysis to reduce data shuffling and improve performance.
+- **Materialized Views:**  
+  If you run this query frequently, consider creating a materialized view or a persisted table for the aggregated results to further improve performance for downstream queries[[2]](https://docs.databricks.com/aws/en/cheat-sheet/bi-serving-data-prep/ "/docs.databricks.com/aws/en/cheat-sheet/bi-serving-data-prep/").
+- **Predicate Pushdown:**  
+  Make sure your filters (especially on date and result state) are applied as early as possible in the query to take advantage of predicate pushdown and partition pruning[[2]](https://docs.databricks.com/aws/en/cheat-sheet/bi-serving-data-prep/ "/docs.databricks.com/aws/en/cheat-sheet/bi-serving-data-prep/").
+
+### Final Confirmation
+
+Your query is well-aligned with Databricks best practices for data engineering, observability, and cost analysis. It is optimized for performance and clarity, and it leverages the strengths of the Databricks platform and system tables. For further optimization, keep your system tables' statistics up to date and consider materialized views for repeated analysis[[3]](https://docs.databricks.com/aws/en/optimizations/cbo/ "/docs.databricks.com/aws/en/optimizations/cbo/")[[2]](https://docs.databricks.com/aws/en/cheat-sheet/bi-serving-data-prep/ "/docs.databricks.com/aws/en/cheat-sheet/bi-serving-data-prep/")[[1]](https://docs.databricks.com/aws/en/data-engineering/best-practices/ "/docs.databricks.com/aws/en/data-engineering/best-practices/").
+
+If you have very large data volumes or performance concerns, you can use the `EXPLAIN` command to review the query plan and ensure that joins and aggregations are being executed efficiently. If statistics are missing, update them as recommended by the optimizer[[3]](https://docs.databricks.com/aws/en/optimizations/cbo/ "/docs.databricks.com/aws/en/optimizations/cbo/").
 
 
 
 
 
 *Always review the accuracy of responses.*
+
+To convert your SQL query into Python code using pandas, you would first need to read the relevant Parquet files from S3 into pandas DataFrames. Then, you would perform the necessary joins and aggregations using pandas operations.
+
+Here’s a step-by-step example:
+
+```python
+import pandas as pd
+
+# Read each table from its respective Parquet file in S3
+pipeline_update_timeline = pd.read_parquet('s3://your-bucket/system.lakeflow.pipeline_update_timeline.parquet')
+pipelines = pd.read_parquet('s3://your-bucket/system.lakeflow.pipelines.parquet')
+clusters = pd.read_parquet('s3://your-bucket/system.compute.clusters.parquet')
+node_types = pd.read_parquet('s3://your-bucket/system.compute.node_types.parquet')
+node_timeline = pd.read_parquet('s3://your-bucket/system.compute.node_timeline.parquet')
+billing_usage = pd.read_parquet('s3://your-bucket/system.billing.usage.parquet')
+
+# Filter for yesterday and completed runs
+yesterday = pd.Timestamp.today().normalize() - pd.Timedelta(days=1)
+pipeline_update_timeline = pipeline_update_timeline[
+    (pipeline_update_timeline['result_state'] == 'COMPLETED') &
+    (pd.to_datetime(pipeline_update_timeline['period_start_time']).dt.date == yesterday.date())
+]
+
+pipelines = pipelines[pipelines['pipeline_type'] == 'ETL_PIPELINE']
+
+# Merge/join tables
+merged = pipeline_update_timeline.merge(
+    pipelines, on=['workspace_id', 'pipeline_id'], how='inner'
+).merge(
+    clusters, left_on='compute', right_on='cluster_id', how='inner'
+).merge(
+    node_timeline, left_on='cluster_id', right_on='cluster_id', how='inner'
+)
+
+# Join node_types for worker nodes
+merged = merged.merge(
+    node_types, left_on='worker_node_type', right_on='node_type', how='left'
+)
+
+# Join billing usage
+merged = merged.merge(
+    billing_usage,
+    left_on=['cluster_id', 'pipeline_id', 'update_id'],
+    right_on=['usage_metadata.cluster_id', 'usage_metadata.dlt_pipeline_id', 'usage_metadata.dlt_update_id'],
+    how='left'
+)
+
+# Aggregations per pipeline run
+agg = merged.groupby(['workspace_id', 'pipeline_id', 'update_id']).agg(
+    min_cpu_used_percent=pd.NamedAgg(column='cpu_user_percent', aggfunc='min'),
+    max_cpu_used_percent=pd.NamedAgg(column='cpu_user_percent', aggfunc='max'),
+    avg_cpu_used_percent=pd.NamedAgg(column='cpu_user_percent', aggfunc='mean'),
+    min_mem_used_percent=pd.NamedAgg(column='mem_used_percent', aggfunc='min'),
+    max_mem_used_percent=pd.NamedAgg(column='mem_used_percent', aggfunc='max'),
+    avg_mem_used_percent=pd.NamedAgg(column='mem_used_percent', aggfunc='mean'),
+    total_network_sent_mb=pd.NamedAgg(column='network_sent_bytes', aggfunc=lambda x: x.sum() / (1024 * 1024)),
+    total_network_received_mb=pd.NamedAgg(column='network_received_bytes', aggfunc=lambda x: x.sum() / (1024 * 1024)),
+    total_cost=pd.NamedAgg(column='usage_amount', aggfunc='sum')
+).reset_index()
+
+print(agg)
+```
+This code:
+- Reads each table from S3 Parquet files.
+- Filters for completed pipeline runs for yesterday.
+- Joins the tables on relevant keys.
+- Aggregates CPU, memory, network, and cost metrics per pipeline run.
+
+**Note:**  
+- You may need to adjust column names and join keys to match your actual schema.
+- If your Parquet files are partitioned, you can optimize reads by specifying filters in `read_parquet`.
+- For large datasets, consider using PySpark DataFrames instead of pandas for scalability.
+
+Let me know if you need a PySpark version or want to see how to write the results back to S3!
+
+*Always review the accuracy of responses.*
+
+
+
 -----///////
 Use system tables: system.compute.node_timeline, system.lakeflow.pipeline_update_timeline and result_state is COMPLETED,
 system.lakeflow.pipelines, system.billing.usage,
