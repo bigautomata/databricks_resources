@@ -77,11 +77,18 @@ to express declaratively.													SQL-based transformations or managed workf
 Performance optimizations necessitate manual tuning. 						Data processing frameworks such as pipelines provide built-in 
 																			optimizations.
 
+
+Components
 Standard connectors: provide the ability to access data from a wider range of data sources from within 
 pipelines or other queries.
 
+Connectors: Components that ingest data from external sources. These include Auto Loader, Kafka, Kinesis, and Lakeflow connectors.
+
 AutoLoader to ingest data into a Delta table.
 
+Engines: Processing engines that execute queries, including Structured Streaming.
+
+Datasets: Streaming tables, materialized views, Delta tables, and views that persist and serve data.
 
 To analyze compute utilization (CPU, memory, network), node types (hardware information), cluster compute configurations, and actual cost for running **Lakeflow Spark Declarative Pipelines** (formerly DLT) for "yesterday" in Databricks, you need to use a combination of system tables. Here’s a thorough review of the required tables and their purpose:
 
