@@ -1,29 +1,44 @@
 Lakeflow Spark Declarative Pipelines, or SDP:
-declarative framework that reduces the complexity of building and managing 
+- Declarative framework that reduces the complexity of building and managing 
 efficient batch and streaming data pipelines.
-extends and interoperable with Apache Spark Declarative Pipelines.
-runs on the performance-optimized Databricks Runtime.
-automatically orchestrates the execution of flows, sinks, streaming tables,
+- It extends and interoperable with Apache Spark Declarative Pipelines.
+- It runs on the performance-optimized Databricks Runtime.
+- It automatically orchestrates the execution of flows, sinks, streaming tables,
 and materialized views by encapsulating and running them as 
 a pipeline. See Lakeflow Spark Declarative Pipelines.
-uses the same DataFrame API as Apache Spark and Structured Streaming. 
-can write into streaming tables and sinks, such as a Kafka topic, using streaming semantics.
-can write to a materialized view using batch semantics.
+- It uses the same DataFrame API as Apache Spark and Structured Streaming. 
+- It can write into streaming tables and sinks, such as a Kafka topic, using streaming semantics.
+- It can write to a materialized view using batch semantics.
 
-A streaming table is a Delta table with additional support for streaming or incremental data processing. It acts as a target for one or more flows in pipelines
+A streaming table is a Delta table with additional support for streaming or 
+incremental data processing. It acts as a target for one or more flows in pipelines
 
 A materialized view is a view with cached results for 
 faster access. A materialized view acts as a target for pipelines.
 
-The external data sinks as targets. These sinks can include event streaming services, like Apache Kafka or Azure Event Hubs, external tables managed by Unity Catalog, or custom sinks defined in Python.
+The external data sinks as targets. These sinks can include event streaming services, like Apache Kafka or Azure Event Hubs, 
+external tables managed by Unity Catalog, or custom sinks defined in Python.
 
 Databricks Runtime for Apache Spark
-- Databricks Runtime is a performance-optimized compute environment
-for running Spark workloads, including batch and streaming.
-- Databricks Runtime provides Photon, a high-performance Databricks-native vectorized query engine,
-and various infrastructure optimizations like autoscaling. 
-- It enables to run Spark and Structured Streaming workloads on the Databricks Runtime by building 
-Spark programs as notebooks, JARs, or Python wheels. See Databricks Runtime for Apache Spark.
+- Databricks Runtime is a performance-optimized compute environment for running Spark workloads, including batch and streaming.
+- Databricks Runtime provides Photon, a high-performance Databricks-native vectorized query engine, and various infrastructure
+optimizations like autoscaling. 
+- Spark and Structured Streaming workloads run on the Databricks Runtime by building Spark programs as notebooks, JARs, 
+or Python wheels. See Databricks Runtime for Apache Spark.
+
+Declarative data processing?
+
+Declarative data processing abstracts the how and focuses on defining the desired result. Instead of specifying 
+step-by-step instructions, define transformation logic, and the system determines the most efficient execution plan.
+See https://docs.databricks.com/aws/en/data-engineering/procedural-vs-declarative#what-is-declarative-data-processing
+
+Functionalities of declarative processing
+
+The following are characteristics of declarative processing:
+Abstraction of execution details: Describe the desired outcome, not the steps to achieve it.
+Automatic optimization: The system applies query planning and execution tuning.
+Reduced complexity: Removes the need for explicit control structures, improving maintainability.
+Related concepts: Declarative programming includes domain-specific and functional programming paradigms.
 
 Standard connectors: provide the ability to access data from a wider range of data sources from within 
 pipelines or other queries.
