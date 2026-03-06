@@ -16,6 +16,15 @@ A materialized view is a view with cached results for
 faster access. A materialized view acts as a target for pipelines.
 
 The external data sinks as targets. These sinks can include event streaming services, like Apache Kafka or Azure Event Hubs, external tables managed by Unity Catalog, or custom sinks defined in Python.
+
+Databricks Runtime for Apache Spark
+- Databricks Runtime is a performance-optimized compute environment
+for running Spark workloads, including batch and streaming.
+- Databricks Runtime provides Photon, a high-performance Databricks-native vectorized query engine,
+and various infrastructure optimizations like autoscaling. 
+- It enables to run Spark and Structured Streaming workloads on the Databricks Runtime by building 
+Spark programs as notebooks, JARs, or Python wheels. See Databricks Runtime for Apache Spark.
+
 Standard connectors: provide the ability to access data from a wider range of data sources from within 
 pipelines or other queries.
 
