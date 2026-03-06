@@ -40,6 +40,43 @@ Automatic optimization: The system applies query planning and execution tuning.
 Reduced complexity: Removes the need for explicit control structures, improving maintainability.
 Related concepts: Declarative programming includes domain-specific and functional programming paradigms.
 
+Common use cases for declarative processing
+See https://docs.databricks.com/aws/en/data-engineering/procedural-vs-declarative#common-use-cases-for-declarative-processing
+The following are common use cases for declarative processing:
+
+SQL-based transformations in batch and streaming workflows.
+High-level data processing frameworks such as pipelines.
+Scalable, distributed data workloads requiring automated optimizations.
+
+Declarative processing with pipelines
+
+Lakeflow Spark Declarative Pipelines is a declarative framework designed to simplify the creation of reliable and
+maintainable stream processing pipelines. By specifying what data to ingest and how to transform it, pipelines automate 
+key aspects of processing management, including orchestration, compute management, monitoring, data quality enforcement, and error handling.
+
+Key differences: procedural vs. declarative processing
+https://docs.databricks.com/aws/en/data-engineering/procedural-vs-declarative#key-differences-procedural-vs-declarative-processing
+
+Aspect				Procedural processing					Declarative processing
+Control				Full control over execution				Execution handled by system
+Complexity			Can be complex and verbose				Generally simpler and more concise
+Optimization		Requires manual tuning					System handles optimization
+Flexibility			High, but requires expertise			Lower, but easier to use
+Use Cases			Custom pipelines, performance tuning	SQL queries, managed pipelines
+
+When to choose/use procedural or declarative processing
+See https://docs.databricks.com/aws/en/data-engineering/procedural-vs-declarative#when-to-choose-procedural-or-declarative-processing
+
+The following table outlines some of the key decision points for procedural and declarative processing:
+
+Procedural processing														Declarative processing
+Fine-grained control over execution logic is required.						Simplified development and maintenance are priorities.
+Transformations involve complex business rules that are difficult
+to express declaratively.													SQL-based transformations or managed workflows eliminate the
+																			need for procedural control.
+Performance optimizations necessitate manual tuning. 						Data processing frameworks such as pipelines provide built-in 
+																			optimizations.
+
 Standard connectors: provide the ability to access data from a wider range of data sources from within 
 pipelines or other queries.
 
