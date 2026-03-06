@@ -6,9 +6,19 @@ runs on the performance-optimized Databricks Runtime.
 automatically orchestrates the execution of flows, sinks, streaming tables,
 and materialized views by encapsulating and running them as 
 a pipeline. See Lakeflow Spark Declarative Pipelines.
+uses the same DataFrame API as Apache Spark and Structured Streaming. 
+can write into streaming tables and sinks, such as a Kafka topic, using streaming semantics.
+can write to a materialized view using batch semantics.
 
+A streaming table is a Delta table with additional support for streaming or incremental data processing. It acts as a target for one or more flows in pipelines
+
+A materialized view is a view with cached results for 
+faster access. A materialized view acts as a target for pipelines.
+
+The external data sinks as targets. These sinks can include event streaming services, like Apache Kafka or Azure Event Hubs, external tables managed by Unity Catalog, or custom sinks defined in Python.
 Standard connectors: provide the ability to access data from a wider range of data sources from within 
 pipelines or other queries.
+
 AutoLoader to ingest data into a Delta table.
 
 
