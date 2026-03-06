@@ -9,6 +9,8 @@ a pipeline. See Lakeflow Spark Declarative Pipelines.
 - It uses the same DataFrame API as Apache Spark and Structured Streaming. 
 - It can write into streaming tables and sinks, such as a Kafka topic, using streaming semantics.
 - It can write to a materialized view using batch semantics.
+- Defines the transformations to perform on data, and Lakeflow Spark Declarative Pipelines manages orchestration,
+monitoring, data quality, errors, and more. Therefore, it offers automation and less overhead/customization (some).
 
 A streaming table is a Delta table with additional support for streaming or 
 incremental data processing. It acts as a target for one or more flows in pipelines
@@ -79,16 +81,34 @@ Performance optimizations necessitate manual tuning. 						Data processing frame
 
 
 Components
-Standard connectors: provide the ability to access data from a wider range of data sources from within 
-pipelines or other queries.
 
 Connectors: Components that ingest data from external sources. These include Auto Loader, Kafka, Kinesis, and Lakeflow connectors.
-
-AutoLoader to ingest data into a Delta table.
 
 Engines: Processing engines that execute queries, including Structured Streaming.
 
 Datasets: Streaming tables, materialized views, Delta tables, and views that persist and serve data.
+
+
+Managed connectors: 
+See https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/
+Leverage efficient incremental reads/writes to make data ingestion faster, scalable, and more cost-efficient for downstream consumption.
+
+Standard connectors:
+See https://docs.databricks.com/aws/en/ingestion/
+Provide the ability to access data from a wider range of data sources from within pipelines or other queries. For examplem AutoLoader to 
+ingest data into a Delta table.
+
+Standard connectors in Databricks, which offer higher levels of ingestion pipeline customization compared to the managed connectors.
+
+Connectors operate at multiple layers of the ETL stack. For example, can use standard connectors in either 
+Structured Streaming for full customization or Lakeflow Spark Declarative Pipelines for a more managed experience.
+
+Three layers of ingestion products in Databricks, ordered from most customizable to most managed:
+See https://docs.databricks.com/aws/en/ingestion/#-layers-of-the-etl-stack
+
+Choose a connector
+See https://docs.databricks.com/aws/en/ingestion/#choose-a-connector
+
 
 To analyze compute utilization (CPU, memory, network), node types (hardware information), cluster compute configurations, and actual cost for running **Lakeflow Spark Declarative Pipelines** (formerly DLT) for "yesterday" in Databricks, you need to use a combination of system tables. Here’s a thorough review of the required tables and their purpose:
 
