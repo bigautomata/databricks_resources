@@ -1,3 +1,17 @@
+Lakeflow Spark Declarative Pipelines, or SDP:
+declarative framework that reduces the complexity of building and managing 
+efficient batch and streaming data pipelines.
+extends and interoperable with Apache Spark Declarative Pipelines.
+runs on the performance-optimized Databricks Runtime.
+automatically orchestrates the execution of flows, sinks, streaming tables,
+and materialized views by encapsulating and running them as 
+a pipeline. See Lakeflow Spark Declarative Pipelines.
+
+Standard connectors: provide the ability to access data from a wider range of data sources from within 
+pipelines or other queries.
+AutoLoader to ingest data into a Delta table.
+
+
 To analyze compute utilization (CPU, memory, network), node types (hardware information), cluster compute configurations, and actual cost for running **Lakeflow Spark Declarative Pipelines** (formerly DLT) for "yesterday" in Databricks, you need to use a combination of system tables. Here’s a thorough review of the required tables and their purpose:
 
 ---
