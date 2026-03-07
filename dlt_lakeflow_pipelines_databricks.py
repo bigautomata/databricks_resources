@@ -3,6 +3,7 @@ Lakeflow Spark Declarative Pipelines, or SDP:
 - reduces the complexity of building and managing 
 efficient batch and streaming data pipelines.
 - extends and interoperable with Apache Spark Declarative Pipelines.
+- offers more automation and less overhead than Structured Streaming. 
 - runs on the performance-optimized Databricks Runtime.
 - automatically orchestrates the execution of flows, sinks, streaming tables,
 and materialized views by encapsulating and running them as 
