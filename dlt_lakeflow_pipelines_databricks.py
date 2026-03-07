@@ -1,15 +1,16 @@
 Lakeflow Spark Declarative Pipelines, or SDP:
-- Declarative framework that reduces the complexity of building and managing 
+- builds on Structured Streaming, offering a declarative framework for creating data pipelines.
+- reduces the complexity of building and managing 
 efficient batch and streaming data pipelines.
-- It extends and interoperable with Apache Spark Declarative Pipelines.
-- It runs on the performance-optimized Databricks Runtime.
-- It automatically orchestrates the execution of flows, sinks, streaming tables,
+- extends and interoperable with Apache Spark Declarative Pipelines.
+- runs on the performance-optimized Databricks Runtime.
+- automatically orchestrates the execution of flows, sinks, streaming tables,
 and materialized views by encapsulating and running them as 
 a pipeline. See Lakeflow Spark Declarative Pipelines.
-- It uses the same DataFrame API as Apache Spark and Structured Streaming. 
-- It can write into streaming tables and sinks, such as a Kafka topic, using streaming semantics.
-- It can write to a materialized view using batch semantics.
-- Defines the transformations to perform on data, and Lakeflow Spark Declarative Pipelines manages orchestration,
+- uses the same DataFrame API as Apache Spark and Structured Streaming. 
+- can write into streaming tables and sinks, such as a Kafka topic, using streaming semantics.
+- can write to a materialized view using batch semantics.
+- defines the transformations to perform on data, and Lakeflow Spark Declarative Pipelines manages orchestration,
 monitoring, data quality, errors, and more. Therefore, it offers automation and less overhead/customization (some).
 
 A streaming table is a Delta table with additional support for streaming or 
