@@ -1,3 +1,127 @@
+## A gRPC 
+gRPC is a high-performance, open-source RPC (Remote Procedure Call) protocol used for building efficient, high-throughput data ingestion
+applications.
+
+gRPC is best suited for high-volume, low-latency ingestion scenarios, while REST is recommended for massive fleets of devices with infrequent updates[2].
+
+The Zerobus Ingest connector supports both gRPC and REST interfaces, but gRPC is recommended for scenarios requiring persistent
+connections and high-volume streaming.
+
+Key points about gRPC in Zerobus Ingest:
+Persistent Connections: gRPC uses long-lived streams, which are ideal for high-throughput applications. Each stream is a direct connection
+between your client and the Zerobus Ingest server, allowing for efficient data transfer and guaranteed event ordering per stream[1 https://docs.databricks.com/aws/en/ingestion/zerobus-overview/].
+SDK Support: Databricks provides SDKs (such as Go and Rust) that use gRPC to facilitate developer-friendly interfaces for building
+ingestion pipelines. These SDKs wrap the gRPC protocol, making it easier to implement and manage streams[2 https://docs.databricks.com/aws/en/ingestion/zerobus-ingest/].
+Connection Tax: Every open gRPC stream counts against concurrency quotas, so it's important to manage the number of streams based on
+throughput requirements[2].
+Ordering Guarantees: Event delivery ordering is guaranteed at the per-stream level, which is important for applications that
+require strict data consistency[1].
+
+## Catalog-managed commits																												 
+Catalog-managed commits are a Delta Lake feature in Databricks that shifts the coordination of commit operations from the file system
+(at the individual table level) to Unity Catalog. With catalog-managed commits, Unity Catalog becomes the single source of truth for the
+state of Delta tables. This enables consistent governance and orchestration of commits across multiple tables, while maintaining
+Delta Lake's ACID guarantees[1 https://docs.databricks.com/aws/en/delta/catalog-managed-commits/].
+
+Key benefits of catalog-managed commits:
+Multi-table transactions: Run multiple SQL statements across multiple tables as a single atomic commit—either all changes succeed together
+or all fail together.
+Governed access: Reads and writes are coordinated through Unity Catalog, ensuring engines see the latest committed state and 
+governance policies are enforced.
+Faster query planning and writes: Unity Catalog provides table-level metadata directly, reducing metadata latency.
+Enforceable constraints: Unity Catalog validates schema and constraint changes, preventing incompatible updates that could break data
+integrity or downstream workloads[1].
+
+How to enable catalog-managed commits:
+For new tables, set the table property delta.feature.catalogManaged = 'supported' when creating the table:
+CREATE TABLE sales_data (
+  sale_id BIGINT,
+  amount DECIMAL(10,2),
+  sale_date DATE
+)
+TBLPROPERTIES ('delta.feature.catalogManaged' = 'supported');
+
+For existing tables, use:
+ALTER TABLE sales_data SET TBLPROPERTIES ('delta.feature.catalogManaged' = 'supported');
+
+Requirements:
+Tables must be Unity Catalog managed (Delta or Iceberg).
+Databricks Runtime 16.4+ is required to read/write/create tables with catalog-managed commits enabled.
+Databricks Runtime 18.0+ is required to enable or disable catalog-managed commits on existing tables[1].
+
+Limitations:
+
+Cannot be enabled/disabled using CREATE OR REPLACE TABLE or REPLACE TABLE.
+Not supported for materialized views, streaming tables, or as a source for Lakeflow Jobs triggers.
+Zerobus cannot write to tables with catalog-managed commits enabled[1].
+
+check if catalog-managed commits are enabled on a table using:
+
+DESCRIBE DETAIL sales_data;
+	
+Look for catalogManaged in the tableFeatures column[1 https://docs.databricks.com/aws/en/delta/catalog-managed-commits/].
+
+## Why and when enable catalog-managed commits?
+
+Enable catalog-managed commits when want to shift transaction coordination from the file system to Unity Catalog, making the catalog
+the single source of truth for table state. This is especially beneficial for organizations seeking consistent governance, improved
+orchestration of multi-table transactions, and enhanced metadata performance across 
+the Lakehouse[1 https://docs.databricks.com/aws/en/delta/catalog-managed-commits/].
+
+Why enable catalog-managed commits:
+Multi-table atomic transactions: Allows to run multiple SQL statements across multiple tables as a single atomic commit, 
+ensuring all changes succeed or fail together[1 https://docs.databricks.com/aws/en/delta/catalog-managed-commits/].
+Governed access: Ensures reads and writes are coordinated through Unity Catalog, applying governance policies and showing engines
+the latest committed state[1].
+Faster query planning and writes: Unity Catalog provides table-level metadata directly, reducing metadata latency and improving performance[1].
+Enforceable constraints: Unity Catalog validates schema and constraint changes, preventing incompatible updates that could break 
+data integrity or downstream workloads[1].
+
+When to enable catalog-managed commits:
+When creating new Unity Catalog managed Delta or Iceberg tables and want the benefits above.
+When need to orchestrate transactions across multiple tables atomically.
+When require stricter governance and metadata consistency for tables.
+When want to improve query planning and write performance for Delta tables.
+When are ready to manage tables through Unity Catalog and are using Databricks Runtime 16.4 or above[1].
+
+Enable catalog-managed commits at table creation or by altering an existing table. For existing tables, enabling catalog-managed commits
+synchronizes the table state with the catalog, which may take several minutes for tables with high write workloads[1].
+
+
+## What, why, when, and how Zerobus cannot write to tables with catalog-managed commits enabled?
+
+Why:
+Zerobus cannot write to tables with catalog-managed commits enabled because the Zerobus Ingest connector does not support
+the catalog-managed commits feature. Catalog-managed commits shift transaction coordination from the file system to Unity Catalog,
+which changes how commit operations are handled. Zerobus is not compatible with this new commit coordination mechanism, so it cannot 
+reliably write data to such tables[1][2].
+
+What:
+This means that if enable catalog-managed commits on a Delta table, Zerobus Ingest will not be able to write data to that table.
+Attempting to do so may result in errors or failed writes[1][2].
+
+When:
+This limitation applies whenever catalog-managed commits are enabled on a table—either at creation
+(using the delta.feature.catalogManaged property) or by altering an existing table to enable this feature.
+As soon as catalog-managed commits are active, Zerobus Ingest is blocked from writing to the table[1][2].
+
+How:
+If try to use Zerobus Ingest to write to a table with catalog-managed commits enabled, the operation will not succeed.
+To avoid this, do not enable catalog-managed commits on tables that need to be written to by Zerobus Ingest.
+If need Zerobus Ingest to write to a table, ensure catalog-managed commits are not enabled on that table.
+
+Check the table’s features using:
+sql
+DESCRIBE DETAIL <table_name>;
+Look for catalogManaged in the tableFeatures column to verify if the feature is enabled[2].
+
+Summary:
+Zerobus cannot write to tables with catalog-managed commits enabled due to incompatibility with the new commit coordination mechanism
+provided by Unity Catalog. This limitation is enforced at all times when the feature is enabled on a table, and should avoid enabling 
+catalog-managed commits on tables that require Zerobus Ingest writes[1 https://docs.databricks.com/aws/en/ingestion/zerobus-limits/]
+[2 https://docs.databricks.com/aws/en/delta/catalog-managed-commits/].
+
+
 Lakeflow Spark Declarative Pipelines, or SDP:
 - builds on Structured Streaming, offering a declarative framework for creating data pipelines.
 - reduces the complexity of building and managing 
